@@ -125,10 +125,15 @@ export default function App() {
 
   const favoriteCount = favorites.length;
   const adminMemeCount = getActiveAdminMemes().length;
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isBackendForced = new URLSearchParams(window.location.search).has("backend");
+  
   const starterCount = adminMemeCount || fallbackMemes.length;
-  const collectionLabel = adminMemeCount
-    ? `${adminMemeCount} active admin memes`
-    : `${fallbackMemes.length} local starter memes`;
+  const collectionLabel = !isLocal || isBackendForced
+    ? "Cloudflare Production Collection"
+    : adminMemeCount
+      ? `${adminMemeCount} active admin memes`
+      : `${fallbackMemes.length} local starter memes`;
   const currentIsVideo = currentMeme?.media_type === "video";
 
   return (

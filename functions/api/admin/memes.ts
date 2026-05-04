@@ -87,7 +87,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     "SELECT * FROM memes ORDER BY uploaded_at DESC"
   ).all<D1MemeRow>();
 
-  return json({ memes: results.map((row: D1MemeRow) => normalizeRow(env, row)) });
+  return json({
+    memes: results.map((row: D1MemeRow) => normalizeRow(env, row)),
+    config: {
+      hasR2PublicUrl: Boolean(env.R2_PUBLIC_URL),
+      hasDatabase: Boolean(env.DB)
+    }
+  });
 };
 
 // POST /api/admin/memes — create one meme metadata row

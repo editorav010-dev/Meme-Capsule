@@ -55,7 +55,9 @@ export default function AdminApp() {
   const [adminToken, setAdminToken] = useState(() => window.sessionStorage.getItem(ADMIN_TOKEN_KEY) || "");
   const [backendMode, setBackendMode] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [notice, setNotice] = useState("Admin collection is local draft storage until Supabase is connected.");
+  const [notice, setNotice] = useState("Admin collection is local draft storage until the Cloudflare backend is connected.");
+  const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
+  const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
 
   const stats = useMemo(() => {
     const active = collection.filter((meme) => meme.status === "active").length;
@@ -112,7 +114,7 @@ export default function AdminApp() {
           input_method: "upload",
           media_type: uploaded.media_type
         }));
-        setNotice("File uploaded to Supabase Storage. Review details, then save the meme.");
+        setNotice("File uploaded to Cloudflare R2. Review details, then save the meme.");
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "Backend upload failed.");
       } finally {
@@ -145,17 +147,34 @@ export default function AdminApp() {
 
   const loadBackend = async () => {
     if (!adminToken.trim()) {
-      setNotice("Enter your admin API token before loading Supabase.");
+      setNotice("Enter your admin API token before loading the backend.");
       return;
     }
 
     setIsSyncing(true);
     try {
       window.sessionStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
-      const memes = await listBackendMemes(adminToken);
-      setCollection(memes.map(normalizeAdminMeme));
+      const response = await fetch("/api/admin/memes", {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "X-Admin-Token": adminToken
+        },
+        cache: "no-store"
+      });
+      
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `Request failed with ${response.status}`);
+      }
+
+      setCollection((payload.memes || []).map(normalizeAdminMeme));
+      setBackendConfig(payload.config || {});
       setBackendMode(true);
-      setNotice("Supabase collection loaded. Saves now go to the backend.");
+      
+      const activeCount = (payload.memes || []).filter((m: any) => m.status === "active").length;
+      setBackendActiveCount(activeCount);
+      
+      setNotice(`Backend connected. ${payload.memes?.length || 0} production memes loaded.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to load backend collection.");
     } finally {
@@ -201,7 +220,11 @@ export default function AdminApp() {
           ? collection.map((existing) => (existing.id === editingOriginalId ? savedMeme : existing))
           : [savedMeme, ...collection];
         setCollection(nextCollection);
-        setNotice(editingOriginalId ? "Meme saved to Supabase." : "Meme added to Supabase.");
+        
+        const nextActiveCount = nextCollection.filter((m) => m.status === "active").length;
+        setBackendActiveCount(nextActiveCount);
+
+        setNotice(editingOriginalId ? "Meme saved to Cloudflare D1." : "Meme added to Cloudflare D1.");
         resetForm();
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "Backend save failed.");
@@ -239,7 +262,7 @@ export default function AdminApp() {
       try {
         const archived = normalizeAdminMeme(await archiveBackendMeme(adminToken, id));
         setCollection((current) => current.map((meme) => (meme.id === id ? archived : meme)));
-        setNotice("Meme archived in Supabase.");
+        setNotice("Meme archived in Cloudflare.");
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "Backend archive failed.");
       } finally {
@@ -295,6 +318,9 @@ export default function AdminApp() {
       </section>
 
       <section className="admin-stats" aria-label="Collection status">
+        <div className={`mode-badge ${backendMode ? "is-backend" : "is-local"}`}>
+          {backendMode ? "BACKEND MODE" : "LOCAL MODE"}
+        </div>
         <span>{stats.total} total</span>
         <span>{stats.active} active</span>
         <span>{stats.drafts} drafts</span>
@@ -303,12 +329,27 @@ export default function AdminApp() {
 
       <section className="admin-panel backend-panel" aria-label="Backend connection">
         <div>
-          <h2>{backendMode ? "Supabase Backend Mode" : "Local Draft Mode"}</h2>
-          <p>
-            Local mode is for quick testing. Backend mode uses Cloudflare Functions, Supabase Storage,
-            and the `public.memes` table.
-          </p>
+            Local mode is for quick testing. Backend mode uses Cloudflare Pages Functions, R2 Storage,
+            and the D1 `memes` table.
         </div>
+
+        {backendMode && !backendConfig.hasR2PublicUrl && (
+          <div className="admin-warning" style={{ background: "rgba(255, 95, 95, 0.1)", borderLeft: "4px solid #ff5f5f" }}>
+            <strong style={{ color: "#ff5f5f" }}>⚠️ Missing R2_PUBLIC_URL</strong>
+            <p>
+              The backend is missing the public URL for your R2 bucket. Memes uploaded to R2 will not load in the main app until you add <code>R2_PUBLIC_URL</code> to your Cloudflare Pages environment variables.
+            </p>
+          </div>
+        )}
+
+        {backendMode && stats.active === 0 && stats.total > 0 && (
+          <div className="admin-warning" style={{ background: "rgba(255, 204, 77, 0.1)", borderLeft: "4px solid #ffcc4d" }}>
+            <strong style={{ color: "#ffcc4d" }}>💡 Tip: Activate your memes</strong>
+            <p>
+              You have {stats.total} memes in the database, but 0 are set to <strong>Active</strong>. The main app only shows memes with "Active" status. Edit your memes below and change their status.
+            </p>
+          </div>
+        )}
         <label>
           <span>Admin API token</span>
           <input
@@ -421,7 +462,7 @@ export default function AdminApp() {
               <input
                 value={form.storage_path || ""}
                 onChange={(event) => updateForm("storage_path", event.target.value)}
-                placeholder="Supabase path, filled after backend upload"
+                placeholder="Cloudflare path, filled after backend upload"
               />
             </label>
             <label className="wide-field">

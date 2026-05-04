@@ -2,10 +2,11 @@ import { getDailyFallbackMeme, getRandomFallbackMeme } from "../data/fallbackMem
 import { pickAdminMeme, pickDailyAdminMeme } from "./adminCollection";
 import type { Meme } from "../types";
 
-const canUseLocalAdminCollection = () =>
-  import.meta.env.DEV ||
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1";
+const canUseLocalAdminCollection = () => {
+  const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const forceBackend = new URLSearchParams(window.location.search).has("backend");
+  return isLocalHost && !forceBackend;
+};
 
 const normalizeMeme = (value: unknown): Meme | null => {
   if (!value || typeof value !== "object") {
