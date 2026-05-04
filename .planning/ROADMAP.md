@@ -52,9 +52,24 @@ Acceptance criteria:
 - No unapproved or scraped content is introduced.
 - UI still feels like a single playful tool, not a feed.
 
-## Phase 2: Cloudflare R2 + D1 Backend — Active
+## Phase 2: Cloudflare R2 + D1 Backend — Complete
 
-Status: ACTIVE
+Status: COMPLETE
+
+Delivered:
+
+- D1 database `meme-capsule-db` created and schema applied.
+- R2 bucket `memes` created with public access enabled.
+- `wrangler.toml` configured with D1 + R2 bindings.
+- `functions/_shared/d1r2.ts` replaces all Supabase backend code.
+- `/api/random-meme` and `/api/daily-meme` query D1.
+- `/api/admin/memes` CRUD uses D1 prepared statements.
+- `/api/admin/upload` stores files in R2.
+- Admin dashboard has Backend/Local mode toggle with status indicators.
+- `.dev.vars` configured with `ADMIN_API_TOKEN` and `R2_PUBLIC_URL`.
+- Fallback memes still work when D1 is empty.
+- `npm.cmd run build` passes.
+- No active imports of `supabase.ts` remain.
 
 Goal: Move curated memes into a zero-cost, zero-egress backend using Cloudflare R2 (file storage) and D1 (SQLite database), keeping everything on one platform with no external vendor dependency.
 
@@ -101,9 +116,9 @@ Acceptance criteria:
 - `npm.cmd run build` still passes.
 - Admin dashboard works with the new backend.
 
-## Phase 3: Launch Prep + Performance Polish
+## Phase 3: Launch Prep + Performance Polish — Active
 
-Status: PLANNED
+Status: ACTIVE
 
 Goal: Prepare the PWA for public sharing while staying on free infrastructure.
 

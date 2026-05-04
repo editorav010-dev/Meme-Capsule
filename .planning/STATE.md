@@ -1,10 +1,10 @@
 ---
 project: Minimalist Meme Capsule
 status: active
-current_phase: 2
-current_phase_name: Cloudflare R2 + D1 Backend
-progress: 10
-updated: 2026-05-04
+current_phase: 3
+current_phase_name: Launch Prep + Performance Polish
+progress: 40
+updated: 2026-05-05
 workspace: C:\Users\avspn\Desktop\meme application
 ---
 
@@ -14,7 +14,7 @@ workspace: C:\Users\avspn\Desktop\meme application
 
 This is a minimalist curated meme PWA. The core product is intentionally tiny: one landing screen, one primary CTA, one random approved meme, and fast share/save actions.
 
-The app has already been implemented as a Vite + React + TypeScript project and moved to:
+The app has already been implemented as a Vite + React + TypeScript project at:
 
 `C:\Users\avspn\Desktop\meme application`
 
@@ -27,17 +27,25 @@ Current implementation includes:
 - Cloudflare Pages Functions in `functions/api/random-meme.ts` and `functions/api/daily-meme.ts`.
 - PWA manifest, icon, service worker, and production headers in `public/`.
 - Public UX cleanup: one repeat CTA only, shown as `Spawn Another` after a meme is visible.
-- Admin dashboard at `/admin` for local draft collection management.
+- Admin dashboard at `/admin` for collection management (local draft + backend modes).
 - Storage/backend documentation in `DATABASE.md`.
 - Save/download bug fixed: files no longer always download as `.svg`.
 - Aspect-ratio bug fixed: public meme display and admin preview no longer force square crops.
 
-Backend migration (Phase 2):
+Backend (Phase 2 — COMPLETE):
 
-- Phase 2 has been redirected from Supabase to Cloudflare R2 + D1.
-- Previous Supabase REST integration exists in `functions/_shared/supabase.ts` (to be replaced).
-- Previous Supabase admin routes exist in `functions/api/admin/` (to be rewritten).
-- New backend will use native Cloudflare bindings for D1 (SQLite) and R2 (object storage).
+- Cloudflare R2 + D1 fully implemented and deployed.
+- D1 database `meme-capsule-db` created with schema applied (ID: `64e2bb16-1557-4d53-8e6b-5197c8636d09`).
+- R2 bucket `memes` created with public access enabled.
+- `wrangler.toml` configured with D1 and R2 bindings.
+- `functions/_shared/d1r2.ts` replaces all Supabase code.
+- Admin CRUD (`/api/admin/memes`) uses D1 prepared statements.
+- Admin upload (`/api/admin/upload`) uses R2 bucket.
+- `.dev.vars` configured with `ADMIN_API_TOKEN` and `R2_PUBLIC_URL`.
+- Old `functions/_shared/supabase.ts` is still present as an unused archive file (no active imports).
+- Admin dashboard enhanced with Backend/Local mode badges, active meme count, and R2_PUBLIC_URL warnings.
+
+Git: Connected to `https://github.com/editorav010-dev/Meme-Capsule` on branch `main`.
 
 Verified command:
 
@@ -45,7 +53,7 @@ Verified command:
 npm.cmd run build
 ```
 
-Build status: passes.
+Build status: passes (last verified 2026-05-05).
 
 ## Product Rules
 
@@ -60,36 +68,31 @@ These rules are locked unless the owner explicitly changes them:
 
 ## Current Phase
 
-Active phase: `2 - Cloudflare R2 + D1 Backend`
+Active phase: `3 - Launch Prep + Performance Polish`
 
 Purpose:
 
-- Replace the Supabase backend with native Cloudflare R2 (file storage) + D1 (SQLite database).
-- Zero egress bandwidth fees, no external vendor dependency.
-- Keep public retrieval limited to reviewed active memes only.
-- Preserve local draft mode as a safe fallback for quick testing.
+- Prepare the PWA for public sharing while staying on free infrastructure.
+- Test on real devices and browsers.
+- Deploy to Cloudflare Pages for a public URL.
+- Verify PWA install behavior.
 
 Immediate next actions:
 
-1. Create `wrangler.toml` with D1 and R2 bindings.
-2. Create `d1/schema.sql` (SQLite version of the Supabase schema).
-3. Rewrite `functions/_shared/supabase.ts` → `functions/_shared/d1r2.ts`.
-4. Rewrite `functions/api/random-meme.ts` to query D1.
-5. Rewrite `functions/api/daily-meme.ts` to query D1.
-6. Rewrite `functions/api/admin/memes.ts` for D1 CRUD.
-7. Rewrite `functions/api/admin/upload.ts` for R2 uploads.
-8. Update `.dev.vars.example` (remove Supabase vars).
-9. Create D1 database and R2 bucket in Cloudflare dashboard.
-10. Test locally with `npx wrangler pages dev`.
+1. Deploy to Cloudflare Pages (connect Git repo or direct upload).
+2. Add D1 + R2 bindings in Cloudflare Pages project settings.
+3. Set production environment variables (`ADMIN_API_TOKEN`, `R2_PUBLIC_URL`).
+4. Test on Android Chrome, iOS Safari, desktop Chrome.
+5. Add some real curated memes via the admin dashboard.
+6. Verify meme spawning from the production D1 database.
+7. Confirm PWA install behavior on mobile.
 
 ## Known Gaps
 
-- D1 database not yet created in Cloudflare dashboard.
-- R2 bucket not yet created in Cloudflare dashboard.
-- `wrangler.toml` does not exist yet.
-- Supabase code still present — needs to be replaced, not deleted until R2+D1 is verified.
-- Current starter memes are generated placeholders, not the owner collection.
-- This Desktop folder is not currently a git repository.
+- No real memes in the production D1 database yet (only fallbacks work).
+- Old `supabase.ts` file still present (unused, can be cleaned up).
+- No privacy policy or content disclaimer page yet.
+- The `.dev.vars` still has placeholder values — real R2 public URL needs to be confirmed.
 
 ## Useful Commands
 
@@ -98,11 +101,9 @@ npm.cmd install
 npm.cmd run dev
 npm.cmd run build
 npm.cmd run preview
-npx wrangler pages dev dist
+npx wrangler pages dev dist --d1 DB=meme-capsule-db --r2 MEMES_BUCKET=memes
 ```
 
 ## Agent Handoff Notes
 
-Future agents should continue from the Desktop project folder, not the old OneDrive `New project` folder. Avoid rebuilding the concept from scratch. Preserve the minimalist one-button meme capsule experience and advance through the roadmap in `.planning/ROADMAP.md`.
-
-Backend migration is from Supabase to Cloudflare R2 + D1. Do not re-add Supabase dependencies.
+Future agents should continue from the Desktop project folder. Backend is Cloudflare R2 + D1 (not Supabase). Do not re-add Supabase dependencies. Preserve the minimalist one-button meme capsule experience. Phase 2 is complete; advance through Phase 3 (Launch Prep) in `.planning/ROADMAP.md`.
