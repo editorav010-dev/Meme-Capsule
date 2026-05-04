@@ -1,6 +1,8 @@
-# Meme Capsule
+# Meme Capsule — Ultimate Minimalist Meme PWA
 
-A minimalist curated meme PWA: one button, one approved meme, fast share/save actions, local favorites, and a daily drop.
+A high-performance, minimalist curated meme platform built with **Vite + React + TypeScript** and powered by **Cloudflare R2 + D1**.
+
+**GitHub Repo:** [https://github.com/editorav010-dev/Meme-Capsule](https://github.com/editorav010-dev/Meme-Capsule)
 
 ## What Is Implemented
 

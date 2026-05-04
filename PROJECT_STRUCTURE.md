@@ -4,6 +4,8 @@
 
 Meme Capsule is a minimalist curated meme PWA built with Vite + React + TypeScript and deployed on Cloudflare Pages. The backend uses Cloudflare R2 (file storage) and D1 (SQLite database) — all on one platform with zero external vendor dependencies.
 
+**Source Code:** [https://github.com/editorav010-dev/Meme-Capsule](https://github.com/editorav010-dev/Meme-Capsule)
+
 ## Directory Map
 
 ```
