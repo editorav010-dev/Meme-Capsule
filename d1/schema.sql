@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS memes (
+  id TEXT PRIMARY KEY DEFAULT ('meme-' || hex(randomblob(6))),
+  title TEXT NOT NULL DEFAULT 'Untitled meme',
+  image_url TEXT,
+  storage_path TEXT,
+  source_link TEXT,
+  category TEXT NOT NULL DEFAULT 'Unsorted',
+  tags TEXT NOT NULL DEFAULT '[]',
+  rarity TEXT NOT NULL DEFAULT 'Common' CHECK (rarity IN ('Common', 'Rare', 'Legendary')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('active', 'draft', 'archived')),
+  media_type TEXT NOT NULL DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
+  input_method TEXT NOT NULL DEFAULT 'url' CHECK (input_method IN ('url', 'upload', 'google-drive', 'seed')),
+  is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0, 1)),
+  uploaded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  shown_count INTEGER NOT NULL DEFAULT 0,
+  share_count INTEGER NOT NULL DEFAULT 0,
+  rights_note TEXT NOT NULL DEFAULT 'reviewed',
+  share_text TEXT NOT NULL DEFAULT 'Spawned from Meme Capsule',
+  random_key REAL NOT NULL DEFAULT (abs(random()) / 9223372036854775807.0),
+  CHECK (image_url IS NOT NULL OR storage_path IS NOT NULL)
+);

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Meme Capsule icon">
+  <rect width="512" height="512" rx="112" fill="#fff8e7"/>
+  <circle cx="256" cy="256" r="172" fill="#14110f"/>
+  <path d="M148 234c0-58 47-105 105-105h6c58 0 105 47 105 105v44c0 58-47 105-105 105h-6c-58 0-105-47-105-105z" fill="#ffcc4d"/>
+  <circle cx="207" cy="244" r="20" fill="#14110f"/>
+  <circle cx="305" cy="244" r="20" fill="#14110f"/>
+  <path d="M202 307c30 31 78 31 108 0" fill="none" stroke="#14110f" stroke-width="24" stroke-linecap="round"/>
+  <path d="M381 132l31-38 20 45 49 5-37 32 11 48-42-25-43 25 12-48-38-32z" fill="#ff5f5f"/>
+</svg>
