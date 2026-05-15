@@ -26,9 +26,10 @@ meme application/
 │   └── api/                      # API route handlers
 │       ├── random-meme.ts        # GET /api/random-meme — public
 │       ├── daily-meme.ts         # GET /api/daily-meme — public
-│       └── admin/                # Admin-only routes (require ADMIN_API_TOKEN)
+│       ├── admin/                # Admin-only routes (require ADMIN_API_TOKEN)
 │           ├── memes.ts          # GET/POST/PATCH/DELETE /api/admin/memes
-│           └── upload.ts         # POST /api/admin/upload
+│           ├── upload.ts         # POST /api/admin/upload
+│           └── sync-r2.ts        # POST /api/admin/sync-r2 (R2→D1 sync)
 │
 ├── public/                       # Static assets served directly
 │   ├── _headers                  # Cloudflare Pages custom headers
@@ -97,6 +98,7 @@ meme application/
 | `daily-meme.ts` | `GET /api/daily-meme` | Returns the daily curated pick | D1 database → fallback memes |
 | `admin/memes.ts` | `GET/POST/PATCH/DELETE /api/admin/memes` | Admin CRUD for meme metadata | D1 database |
 | `admin/upload.ts` | `POST /api/admin/upload` | Uploads image/video to R2 storage | R2 bucket |
+| `admin/sync-r2.ts` | `POST /api/admin/sync-r2` | Scans R2 and creates D1 records for untracked files | R2 bucket → D1 database |
 | `_shared/d1r2.ts` | (shared module) | D1 queries, R2 helpers, auth, fallback logic | D1, R2, fallback memes |
 
 ### Data Flow
@@ -122,6 +124,15 @@ Admin uploads a meme
   │
   └── POST /api/admin/memes (metadata → D1)
         └── Sets status='draft', is_active=0 until manually activated
+```
+
+```
+Admin clicks "Sync R2 Files to D1"
+  │
+  └── POST /api/admin/sync-r2
+        ├── Lists all files in R2 bucket
+        ├── Checks which files have no D1 record
+        └── Creates D1 rows for missing files (status='active', is_active=1)
 ```
 
 ## Infrastructure

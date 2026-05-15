@@ -80,3 +80,21 @@ export const uploadBackendMemeFile = async (adminToken: string, file: File) => {
   });
   return parseJsonResponse<AdminUploadResponse>(response);
 };
+
+export type SyncR2Response = {
+  message: string;
+  totalR2Files: number;
+  alreadyInD1: number;
+  newlySynced: number;
+  syncedFiles: string[];
+};
+
+export const syncR2ToD1 = async (adminToken: string) => {
+  const response = await fetch("/api/admin/sync-r2", {
+    method: "POST",
+    headers: authHeaders(adminToken),
+    cache: "no-store"
+  });
+  return parseJsonResponse<SyncR2Response>(response);
+};
+

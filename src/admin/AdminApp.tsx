@@ -6,6 +6,7 @@ import {
   ImagePlus,
   Link as LinkIcon,
   ListChecks,
+  RefreshCw,
   Save,
   Trash2,
   UploadCloud
@@ -15,6 +16,7 @@ import {
   archiveBackendMeme,
   listBackendMemes,
   saveBackendMeme,
+  syncR2ToD1,
   uploadBackendMemeFile
 } from "../lib/adminApi";
 import {
@@ -186,6 +188,33 @@ export default function AdminApp() {
     setCollection(readAdminCollection());
     setBackendMode(false);
     setNotice("Switched to local draft mode.");
+  };
+
+  const handleSyncR2 = async () => {
+    if (!adminToken.trim()) {
+      setNotice("Enter your admin API token before syncing.");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const result = await syncR2ToD1(adminToken);
+      setNotice(
+        `✅ ${result.message} (${result.totalR2Files} total in R2, ${result.alreadyInD1} already tracked)`
+      );
+
+      // Auto-reload the collection to show newly synced memes
+      if (result.newlySynced > 0) {
+        const memes = await listBackendMemes(adminToken);
+        setCollection(memes.map(normalizeAdminMeme));
+        const activeCount = memes.filter((m) => m.status === "active").length;
+        setBackendActiveCount(activeCount);
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "R2 sync failed.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -366,6 +395,12 @@ export default function AdminApp() {
           <button type="button" onClick={loadBackend} disabled={isSyncing}>
             Load Backend Collection
           </button>
+          {backendMode && (
+            <button type="button" onClick={handleSyncR2} disabled={isSyncing}>
+              <RefreshCw size={16} aria-hidden="true" />
+              {isSyncing ? "Syncing..." : "Sync R2 Files to D1"}
+            </button>
+          )}
           <button type="button" onClick={useLocalMode} disabled={isSyncing}>
             Use Local Drafts
           </button>

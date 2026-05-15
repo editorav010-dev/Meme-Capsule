@@ -122,14 +122,20 @@ Status: ACTIVE
 
 Goal: Prepare the PWA for public sharing while staying on free infrastructure.
 
-Tasks:
+Delivered:
+
+- Deployed to Cloudflare Pages with D1 + R2 bindings.
+- Environment variables (`ADMIN_API_TOKEN`, `R2_PUBLIC_URL`) configured.
+- R2-to-D1 sync feature: `POST /api/admin/sync-r2` scans R2 bucket and auto-creates D1 records for untracked files.
+- Admin dashboard "Sync R2 Files to D1" button for bulk-importing memes uploaded directly to R2.
+
+Remaining tasks:
 
 - Test on Android Chrome, iOS Safari, desktop Chrome, and narrow mobile widths.
 - Verify native share sheet behavior where supported.
 - Verify download/save fallback behavior.
 - Add or confirm privacy policy and content disclaimer.
 - Confirm caching headers and PWA install behavior.
-- Deploy to Cloudflare Pages.
 
 Acceptance criteria:
 
@@ -137,6 +143,7 @@ Acceptance criteria:
 - Random meme flow is fast on mobile data.
 - No layout overlap at common viewport sizes.
 - PWA can be installed on supported browsers.
+- Files uploaded directly to R2 can be synced to D1 via admin dashboard.
 
 ## Phase 4: Optional Growth Features
 
