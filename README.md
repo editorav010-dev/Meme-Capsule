@@ -2,7 +2,7 @@
 
 A high-performance, minimalist curated meme platform built with **Vite + React + TypeScript** and powered by **Cloudflare R2 + D1**.
 
-**GitHub Repo:** [https://github.com/editorav010-dev/Meme-Capsule](https://github.com/editorav010-dev/Meme-Capsule)
+**GitHub Repo:** [https://github.com/bbethical010-glitch/meme-capsule](https://github.com/bbethical010-glitch/meme-capsule)
 
 ## What Is Implemented
 

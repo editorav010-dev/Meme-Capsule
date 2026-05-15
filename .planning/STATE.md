@@ -45,7 +45,7 @@ Backend (Phase 2 — COMPLETE):
 - Old `functions/_shared/supabase.ts` is still present as an unused archive file (no active imports).
 - Admin dashboard enhanced with Backend/Local mode badges, active meme count, and R2_PUBLIC_URL warnings.
 
-Git: Connected to `https://github.com/editorav010-dev/Meme-Capsule` on branch `main`.
+Git: Connected to `https://github.com/bbethical010-glitch/meme-capsule` on branch `main`.
 
 Verified command:
 
