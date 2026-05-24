@@ -532,7 +532,7 @@ export default function AdminApp() {
               {editingOriginalId ? "Save Changes" : backendMode ? "Add Meme to Backend" : "Add Meme to Collection"}
             </button>
             <button type="button" className="ghost-action" onClick={resetForm}>
-              Reset Form
+              {editingOriginalId ? "Cancel Editing" : "Clear Form"}
             </button>
             <button type="button" className="ghost-action" onClick={exportCollection}>
               <Download size={18} aria-hidden="true" />
@@ -569,7 +569,11 @@ export default function AdminApp() {
             <div className="empty-collection">No admin memes yet. Add one above.</div>
           ) : (
             collection.map((meme) => (
-              <article className="collection-row" key={meme.id} onClick={() => editMeme(meme)}>
+              <article 
+                className={`collection-row ${meme.id === editingOriginalId ? "is-editing" : ""}`} 
+                key={meme.id} 
+                onClick={() => editMeme(meme)}
+              >
                 <div className="thumb">
                   {meme.media_type === "video" ? (
                     <video src={meme.url} muted />

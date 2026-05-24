@@ -309,6 +309,12 @@
   background: rgba(255, 255, 255, 0.95);
 }
 
+.collection-row.is-editing {
+  border-color: var(--ink);
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
 .thumb img,
 .thumb video {
   display: block;
