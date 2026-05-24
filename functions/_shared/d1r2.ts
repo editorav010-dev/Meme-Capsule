@@ -26,6 +26,7 @@ export type D1MemeRow = {
   rights_note: string | null;
   shown_count: number;
   share_count: number;
+  likes_count: number;
   random_key: number;
 };
 
@@ -89,7 +90,8 @@ export const normalizeRow = (env: Env, row: D1MemeRow): Meme => ({
   input_method: (row.input_method as Meme["input_method"]) || "url",
   uploaded_at: row.uploaded_at || new Date().toISOString(),
   share_text: row.share_text || "Spawned from Meme Capsule",
-  rights_note: row.rights_note || undefined
+  rights_note: row.rights_note || undefined,
+  likes_count: row.likes_count ?? 0
 });
 
 export const getRandomMeme = async (env: Env): Promise<Meme | null> => {

@@ -128,6 +128,7 @@ Delivered:
 - Environment variables (`ADMIN_API_TOKEN`, `R2_PUBLIC_URL`) configured.
 - R2-to-D1 sync feature: `POST /api/admin/sync-r2` scans R2 bucket and auto-creates D1 records for untracked files.
 - Admin dashboard "Sync R2 Files to D1" button for bulk-importing memes uploaded directly to R2.
+- Real-time global like/unlike system with SQLite (D1) database integration, client-side pre-liked state caching, and live count syncing.
 
 Remaining tasks:
 

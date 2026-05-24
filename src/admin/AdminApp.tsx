@@ -573,6 +573,7 @@ export default function AdminApp() {
                   <strong>{meme.title}</strong>
                   <span>{meme.id}</span>
                   <span>{meme.category} / {meme.status}</span>
+                  <span>Likes: {meme.likes_count ?? 0}</span>
                   <span>{new Date(meme.uploaded_at).toLocaleDateString()}</span>
                   <a href={meme.source_link || meme.url} target="_blank" rel="noreferrer">
                     <LinkIcon size={14} aria-hidden="true" />

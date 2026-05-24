@@ -81,3 +81,35 @@ export const getDailyMeme = async () => {
     return getDailyFallbackMeme();
   }
 };
+
+export const toggleLikeMeme = async (id: string, action: "like" | "unlike"): Promise<number> => {
+  const response = await fetch("/api/like", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, action })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to toggle like: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { success: boolean; likes_count: number };
+  return data.likes_count;
+};
+
+export const fetchLikeCount = async (id: string): Promise<number> => {
+  try {
+    const response = await fetch(`/api/likes?id=${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    });
+
+    if (!response.ok) return 0;
+
+    const data = (await response.json()) as { likes_count: number };
+    return data.likes_count ?? 0;
+  } catch {
+    return 0;
+  }
+};
+

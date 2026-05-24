@@ -18,4 +18,5 @@ export type Meme = {
   status?: MemeStatus;
   media_type?: MemeMediaType;
   input_method?: MemeInputMethod;
+  likes_count?: number;
 };

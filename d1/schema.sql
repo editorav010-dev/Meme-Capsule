@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS memes (
   uploaded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   shown_count INTEGER NOT NULL DEFAULT 0,
   share_count INTEGER NOT NULL DEFAULT 0,
+  likes_count INTEGER NOT NULL DEFAULT 0,
   rights_note TEXT NOT NULL DEFAULT 'reviewed',
   share_text TEXT NOT NULL DEFAULT 'Spawned from Meme Capsule',
   random_key REAL NOT NULL DEFAULT (abs(random()) / 9223372036854775807.0),

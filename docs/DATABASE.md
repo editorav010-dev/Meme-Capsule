@@ -69,6 +69,7 @@ Core fields:
 - `uploaded_at`: created/upload timestamp (ISO string).
 - `shown_count`: optional analytics counter.
 - `share_count`: optional analytics counter.
+- `likes_count`: global like analytics counter (integer, default 0).
 - `rights_note`: `original`, `licensed`, `permission`, or `reviewed`.
 - `share_text`: text used by share actions.
 - `random_key`: indexed random selection helper (REAL type).

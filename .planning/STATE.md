@@ -23,7 +23,7 @@ Current implementation includes:
 - Mobile-first meme capsule UI in `src/App.tsx`.
 - Reveal animation and polished responsive styling in `src/styles.css`.
 - Local curated starter meme data in `src/data/fallbackMemes.ts`.
-- Share, save, favorite, Daily Drop, rarity badges, and local LOL reactions.
+- Share, save, global Likes (with SQLite D1 sync & local pre-liked state caching), Daily Drop, rarity badges, and local LOL reactions.
 - Cloudflare Pages Functions in `functions/api/random-meme.ts` and `functions/api/daily-meme.ts`.
 - PWA manifest, icon, service worker, and production headers in `public/`.
 - Public UX cleanup: one repeat CTA only, shown as `Spawn Another` after a meme is visible.
@@ -63,7 +63,7 @@ These rules are locked unless the owner explicitly changes them:
 - Only owner-curated, approved memes are allowed.
 - Keep the app minimal, fast, playful, and uncluttered.
 - No comments, feeds, accounts, followers, chat, or public uploads in v1.
-- User favorites and LOL reactions are local-device only for now.
+- LOL reactions are local-device only; Likes are global and sync with the D1 database in real-time.
 - Launch as a PWA before considering Play Store or native wrappers.
 
 ## Current Phase
