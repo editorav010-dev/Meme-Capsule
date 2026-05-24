@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-24
+
+- Verified and documented real-time meme likes feature backend architecture.
+- Simplified Admin UI by making collection rows clickable (no need to click 'Edit').
+- Added `likes_count` input editor inside the Admin UI edit form.
+
 ## 2026-05-04
 
 - Backend migration: Phase 2 redirected from Supabase to Cloudflare R2 + D1.

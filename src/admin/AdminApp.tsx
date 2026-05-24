@@ -74,7 +74,7 @@ export default function AdminApp() {
     setNotice(message);
   };
 
-  const updateForm = (key: keyof FormState, value: string) => {
+  const updateForm = (key: keyof FormState, value: string | number) => {
     setForm((current) => ({
       ...current,
       [key]: value
@@ -516,6 +516,14 @@ export default function AdminApp() {
                 placeholder="original / licensed / permission / reviewed"
               />
             </label>
+            <label>
+              <span>Likes Count</span>
+              <input
+                type="number"
+                value={form.likes_count ?? 0}
+                onChange={(event) => updateForm("likes_count", Number(event.target.value))}
+              />
+            </label>
           </div>
 
           <div className="form-actions">
@@ -561,7 +569,7 @@ export default function AdminApp() {
             <div className="empty-collection">No admin memes yet. Add one above.</div>
           ) : (
             collection.map((meme) => (
-              <article className="collection-row" key={meme.id}>
+              <article className="collection-row" key={meme.id} onClick={() => editMeme(meme)}>
                 <div className="thumb">
                   {meme.media_type === "video" ? (
                     <video src={meme.url} muted />
@@ -575,18 +583,18 @@ export default function AdminApp() {
                   <span>{meme.category} / {meme.status}</span>
                   <span>Likes: {meme.likes_count ?? 0}</span>
                   <span>{new Date(meme.uploaded_at).toLocaleDateString()}</span>
-                  <a href={meme.source_link || meme.url} target="_blank" rel="noreferrer">
+                  <a href={meme.source_link || meme.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                     <LinkIcon size={14} aria-hidden="true" />
                     Source link
                     <ExternalLink size={13} aria-hidden="true" />
                   </a>
                 </div>
                 <div className="row-actions">
-                  <button type="button" onClick={() => editMeme(meme)}>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); editMeme(meme); }}>
                     <Edit3 size={17} aria-hidden="true" />
                     Edit
                   </button>
-                  <button type="button" className="delete-action" onClick={() => deleteMeme(meme.id)}>
+                  <button type="button" className="delete-action" onClick={(e) => { e.stopPropagation(); deleteMeme(meme.id); }}>
                     <Trash2 size={17} aria-hidden="true" />
                     {backendMode ? "Archive" : "Delete"}
                   </button>

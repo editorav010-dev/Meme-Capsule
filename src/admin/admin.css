@@ -299,6 +299,14 @@
   border: 1px solid var(--line);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.collection-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(22, 18, 15, 0.08);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .thumb img,
