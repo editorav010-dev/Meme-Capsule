@@ -11,7 +11,7 @@ import {
   Trash2,
   UploadCloud
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useState, useEffect } from "react";
 import {
   archiveBackendMeme,
   listBackendMemes,
@@ -60,6 +60,14 @@ export default function AdminApp() {
   const [notice, setNotice] = useState("Admin collection is local draft storage until the Cloudflare backend is connected.");
   const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
   const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (adminToken.trim()) {
+      loadBackend();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = useMemo(() => {
     const active = collection.filter((meme) => meme.status === "active").length;
@@ -417,35 +425,23 @@ export default function AdminApp() {
             </div>
           </div>
 
-          <div className="input-mode-grid">
-            <label>
-              <span>Direct meme URL</span>
+          <div className="input-mode-grid simplified">
+            <label className="url-input-zone">
+              <span>Media URL (Direct link or Google Drive)</span>
               <input
-                value={form.input_method === "url" ? form.url : ""}
-                onChange={(event) => handleUrlInput("url", event.target.value)}
-                placeholder="https://cdn.example.com/meme.webp"
-              />
-            </label>
-            <label>
-              <span>Google Drive link</span>
-              <input
-                value={form.input_method === "google-drive" ? form.url : ""}
-                onChange={(event) => handleUrlInput("google-drive", event.target.value)}
-                placeholder="https://drive.google.com/file/d/..."
+                value={form.url}
+                onChange={(event) => handleUrlInput(event.target.value.includes("drive.google") ? "google-drive" : "url", event.target.value)}
+                placeholder="https://..."
               />
             </label>
             <label className="file-drop">
               <UploadCloud size={20} aria-hidden="true" />
-              <span>Upload image/video draft</span>
+              <span>Upload File</span>
               <input accept="image/*,video/*" type="file" onChange={handleFileUpload} />
             </label>
           </div>
 
           <div className="field-grid">
-            <label>
-              <span>Meme ID</span>
-              <input value={form.id} onChange={(event) => updateForm("id", event.target.value)} />
-            </label>
             <label>
               <span>Name / title</span>
               <input
@@ -485,38 +481,6 @@ export default function AdminApp() {
               </select>
             </label>
             <label>
-              <span>Tags</span>
-              <input
-                value={form.tags}
-                onChange={(event) => updateForm("tags", event.target.value)}
-                placeholder="college, exam, relatable"
-              />
-            </label>
-            <label className="wide-field">
-              <span>Storage path</span>
-              <input
-                value={form.storage_path || ""}
-                onChange={(event) => updateForm("storage_path", event.target.value)}
-                placeholder="Cloudflare path, filled after backend upload"
-              />
-            </label>
-            <label className="wide-field">
-              <span>Share text</span>
-              <input
-                value={form.share_text}
-                onChange={(event) => updateForm("share_text", event.target.value)}
-                placeholder="Send this to the group chat"
-              />
-            </label>
-            <label className="wide-field">
-              <span>Rights note</span>
-              <input
-                value={form.rights_note}
-                onChange={(event) => updateForm("rights_note", event.target.value)}
-                placeholder="original / licensed / permission / reviewed"
-              />
-            </label>
-            <label>
               <span>Likes Count</span>
               <input
                 type="number"
@@ -524,6 +488,53 @@ export default function AdminApp() {
                 onChange={(event) => updateForm("likes_count", Number(event.target.value))}
               />
             </label>
+
+            {showAdvanced && (
+              <>
+                <label>
+                  <span>Meme ID</span>
+                  <input value={form.id} onChange={(event) => updateForm("id", event.target.value)} />
+                </label>
+                <label>
+                  <span>Tags</span>
+                  <input
+                    value={form.tags}
+                    onChange={(event) => updateForm("tags", event.target.value)}
+                    placeholder="college, exam, relatable"
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>Storage path</span>
+                  <input
+                    value={form.storage_path || ""}
+                    onChange={(event) => updateForm("storage_path", event.target.value)}
+                    placeholder="Cloudflare path, filled after backend upload"
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>Share text</span>
+                  <input
+                    value={form.share_text}
+                    onChange={(event) => updateForm("share_text", event.target.value)}
+                    placeholder="Send this to the group chat"
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>Rights note</span>
+                  <input
+                    value={form.rights_note}
+                    onChange={(event) => updateForm("rights_note", event.target.value)}
+                    placeholder="original / licensed / permission / reviewed"
+                  />
+                </label>
+              </>
+            )}
+          </div>
+
+          <div className="advanced-toggle" style={{ marginTop: '12px', textAlign: 'right' }}>
+            <button type="button" className="ghost-action" onClick={() => setShowAdvanced(!showAdvanced)} style={{ fontSize: '0.85rem', padding: '6px 12px', minHeight: 'auto' }}>
+              {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+            </button>
           </div>
 
           <div className="form-actions">
