@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meme Capsule Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Chivo:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#1c1b1b",
+                        "error-container": "#93000a",
+                        "on-surface": "#e5e2e1",
+                        "surface-container-highest": "#353534",
+                        "surface": "#131313",
+                        "on-background": "#e5e2e1",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-container": "#7b404e",
+                        "on-error": "#690005",
+                        "surface-bright": "#393939",
+                        "secondary-fixed": "#ffe08b",
+                        "primary-fixed-dim": "#dcb8ff",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-tertiary-fixed-variant": "#6d3542",
+                        "outline": "#968e99",
+                        "inverse-on-surface": "#313030",
+                        "on-secondary-fixed": "#241a00",
+                        "secondary-fixed-dim": "#f1c100",
+                        "on-primary": "#3f225e",
+                        "primary-fixed": "#efdbff",
+                        "secondary-container": "#f1c100",
+                        "surface-tint": "#dcb8ff",
+                        "surface-dim": "#131313",
+                        "on-primary-container": "#634583",
+                        "surface-variant": "#353534",
+                        "tertiary-fixed-dim": "#ffb1c0",
+                        "on-secondary-fixed-variant": "#584400",
+                        "on-tertiary": "#521f2c",
+                        "surface-container-high": "#2a2a2a",
+                        "on-tertiary-fixed": "#380a18",
+                        "background": "#131313",
+                        "primary-container": "#dcb8ff",
+                        "inverse-primary": "#6f518f",
+                        "on-primary-fixed": "#290947",
+                        "on-secondary": "#3d2f00",
+                        "tertiary": "#ffd9df",
+                        "outline-variant": "#4b454f",
+                        "secondary": "#ffe08b",
+                        "primary": "#f0dbff",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#e5e2e1",
+                        "on-surface-variant": "#cdc3d0",
+                        "on-secondary-container": "#665000",
+                        "tertiary-fixed": "#ffd9df",
+                        "tertiary-container": "#ffb1c0",
+                        "on-primary-fixed-variant": "#573976",
+                        "error": "#ffb4ab"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "margin-page": "32px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "stack-lg": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Anton"],
+                        "headline-md": ["Anton"],
+                        "label-sm": ["Chivo"],
+                        "body-md": ["Chivo"],
+                        "body-lg": ["Chivo"],
+                        "headline-lg-mobile": ["Anton"],
+                        "headline-lg": ["Anton"],
+                        "display": ["Anton"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["14px", { "lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.2", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "1.0", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "400" }],
+                        "display": ["64px", { "lineHeight": "1.1", "letterSpacing": "0.04em", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .brutalist-border { border: 4px solid black; }
+        .brutalist-border-sm { border: 2px solid black; }
+        .brutalist-shadow-primary { box-shadow: 4px 4px 0px 0px var(--color-primary, #dcb8ff); }
+        .brutalist-shadow-secondary { box-shadow: 4px 4px 0px 0px var(--color-secondary, #ffe08b); }
+        .brutalist-shadow-black { box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
+        .brutalist-shadow-black-lg { box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); }
+        
+        .brutalist-interactive:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px 0px rgba(0,0,0,1);
+        }
+        .brutalist-interactive:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
+        }
+
+        .brutalist-input:focus {
+            border-color: #dcb8ff;
+            box-shadow: 4px 4px 0px 0px #dcb8ff;
+            outline: none;
+        }
+
+        /* TopAppBar Styles from JSON */
+        .style_separation_logic_topappbar { border-bottom: 4px solid black; }
+        .style_shadows_and_elevation_topappbar { box-shadow: 0px 4px 0px 0px rgba(0,0,0,1); }
+        
+        /* NavigationDrawer Styles from JSON */
+        .style_separation_logic_drawer { border-right: 4px solid black; }
+        .style_shadows_and_elevation_drawer { box-shadow: 8px 0px 0px 0px rgba(0,0,0,1); }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-screen overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface text-primary font-headline-md uppercase italic docked full-width top-0 z-50 style_separation_logic_topappbar style_shadows_and_elevation_topappbar flex justify-between items-center w-full px-gutter py-4">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-3xl cursor-pointer hover:bg-surface-container-highest transition-colors active:translate-y-1 transition-transform p-2">menu</span>
+<span class="font-headline-md text-headline-md uppercase italic text-secondary tracking-wider transform -skew-x-12" style="text-shadow: 2px 2px 0px #ffb1c0;">MEME CAPSULE ADMIN</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-2 brutalist-border-sm bg-surface-container px-3 py-1">
+<span class="font-label-lg text-primary text-xs tracking-widest uppercase">BACKEND MODE</span>
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+</div>
+<div class="hidden md:flex items-center brutalist-border-sm bg-surface-container overflow-hidden">
+<span class="material-symbols-outlined px-2 text-outline">key</span>
+<input class="bg-transparent border-none text-on-surface font-label-sm uppercase focus:ring-0 w-32 focus:w-48 transition-all duration-300 py-1" placeholder="API TOKEN..." type="password" value="••••••••••••"/>
+</div>
+<span class="material-symbols-outlined text-3xl cursor-pointer hover:bg-surface-container-highest transition-colors active:translate-y-1 transition-transform p-2">account_circle</span>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden relative">
+<!-- NavigationDrawer -->
+<nav class="bg-surface-container text-primary h-full style_separation_logic_drawer style_shadows_and_elevation_drawer hidden md:flex flex-col w-72 h-screen left-0 top-0 pt-8 flex-shrink-0 z-40">
+<div class="px-6 mb-8">
+<h2 class="font-headline-lg text-headline-lg text-secondary-fixed">ADMIN CONSOLE</h2>
+</div>
+<ul class="flex flex-col gap-2 px-4">
+<!-- Dashboard (Active) -->
+<li class="bg-primary text-on-primary border-2 border-black translate-x-1 translate-y-1 shadow-none transition-all duration-200 ease-in-out cursor-pointer flex items-center gap-4 p-3 rounded-DEFAULT">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-lg text-label-lg uppercase">Dashboard</span>
+</li>
+<!-- Meme Vault (Inactive) -->
+<li class="text-on-surface-variant hover:text-on-surface hover:bg-surface-bright hover:translate-x-1 transition-all duration-200 ease-in-out cursor-pointer flex items-center gap-4 p-3 rounded-DEFAULT">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-lg text-label-lg uppercase">Meme Vault</span>
+</li>
+<!-- Editor (Inactive) -->
+<li class="text-on-surface-variant hover:text-on-surface hover:bg-surface-bright hover:translate-x-1 transition-all duration-200 ease-in-out cursor-pointer flex items-center gap-4 p-3 rounded-DEFAULT">
+<span class="material-symbols-outlined">edit_square</span>
+<span class="font-label-lg text-label-lg uppercase">Editor</span>
+</li>
+<!-- System Status (Inactive) -->
+<li class="text-on-surface-variant hover:text-on-surface hover:bg-surface-bright hover:translate-x-1 transition-all duration-200 ease-in-out cursor-pointer flex items-center gap-4 p-3 rounded-DEFAULT">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-label-lg text-label-lg uppercase">System Status</span>
+</li>
+</ul>
+<div class="mt-auto p-6 border-t-2 border-black">
+<p class="font-label-sm text-outline-variant uppercase">SYSTEM UPTIME: 99.9%</p>
+<p class="font-label-sm text-outline-variant uppercase">VERSION: 2.4.1-BETA</p>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto bg-background p-margin-page flex flex-col gap-stack-lg">
+<!-- Top Stats Bar -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-stack-md">
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-4 brutalist-interactive transition-all">
+<p class="font-label-sm text-outline uppercase mb-2">Total Memes</p>
+<p class="font-display text-primary">1,402</p>
+</div>
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-4 brutalist-interactive transition-all">
+<p class="font-label-sm text-outline uppercase mb-2">Active</p>
+<p class="font-display text-secondary">984</p>
+</div>
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-4 brutalist-interactive transition-all">
+<p class="font-label-sm text-outline uppercase mb-2">Drafts</p>
+<p class="font-display text-tertiary-container">305</p>
+</div>
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-4 brutalist-interactive transition-all">
+<p class="font-label-sm text-outline uppercase mb-2">Archived</p>
+<p class="font-display text-on-surface-variant">113</p>
+</div>
+</section>
+<!-- Split Pane Layout -->
+<div class="flex flex-col lg:flex-row gap-gutter">
+<!-- Left Pane: Meme Vault -->
+<section class="w-full lg:w-1/2 flex flex-col gap-stack-md">
+<div class="flex justify-between items-end border-b-4 border-black pb-2">
+<h3 class="font-headline-lg text-on-surface uppercase">Meme Vault</h3>
+<div class="flex gap-2">
+<button class="bg-surface-container brutalist-border-sm p-1 brutalist-interactive"><span class="material-symbols-outlined">filter_list</span></button>
+<button class="bg-surface-container brutalist-border-sm p-1 brutalist-interactive"><span class="material-symbols-outlined">sort</span></button>
+</div>
+</div>
+<div class="flex flex-col gap-stack-sm overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+<!-- List Item 1 -->
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-3 flex items-center gap-4 brutalist-interactive transition-all group">
+<div class="w-16 h-16 bg-surface-container-highest brutalist-border-sm flex-shrink-0 relative overflow-hidden">
+<div class="absolute inset-0 bg-primary opacity-20 mix-blend-overlay"></div>
+<span class="material-symbols-outlined absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-primary">image</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-lg text-on-surface uppercase truncate">Doge To The Moon</h4>
+<div class="flex gap-2 mt-1">
+<span class="bg-secondary text-on-secondary px-2 py-0.5 text-[10px] font-label-sm uppercase brutalist-border-sm">ACTIVE</span>
+<span class="text-outline text-xs flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">favorite</span> 12.4k</span>
+</div>
+<p class="text-xs text-outline-variant font-mono mt-1">ID: MEME-001</p>
+</div>
+<div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="bg-surface text-primary brutalist-border-sm px-2 py-1 font-label-sm uppercase hover:bg-primary hover:text-on-primary transition-colors text-[10px]"><span class="material-symbols-outlined text-[14px]">edit</span></button>
+<button class="bg-surface text-error brutalist-border-sm px-2 py-1 font-label-sm uppercase hover:bg-error hover:text-on-error transition-colors text-[10px]"><span class="material-symbols-outlined text-[14px]">delete</span></button>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-3 flex items-center gap-4 brutalist-interactive transition-all group">
+<div class="w-16 h-16 bg-surface-container-highest brutalist-border-sm flex-shrink-0 relative overflow-hidden">
+<span class="material-symbols-outlined absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-tertiary-container">gif_box</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-lg text-on-surface uppercase truncate">Confused Travolta</h4>
+<div class="flex gap-2 mt-1">
+<span class="bg-tertiary-container text-on-tertiary-container px-2 py-0.5 text-[10px] font-label-sm uppercase brutalist-border-sm">DRAFT</span>
+<span class="text-outline text-xs flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">favorite</span> --</span>
+</div>
+<p class="text-xs text-outline-variant font-mono mt-1">ID: MEME-042</p>
+</div>
+<div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="bg-surface text-primary brutalist-border-sm px-2 py-1 font-label-sm uppercase hover:bg-primary hover:text-on-primary transition-colors text-[10px]"><span class="material-symbols-outlined text-[14px]">edit</span></button>
+<button class="bg-surface text-error brutalist-border-sm px-2 py-1 font-label-sm uppercase hover:bg-error hover:text-on-error transition-colors text-[10px]"><span class="material-symbols-outlined text-[14px]">delete</span></button>
+</div>
+</div>
+<!-- List Item 3 -->
+<div class="bg-surface-container brutalist-border brutalist-shadow-black p-3 flex items-center gap-4 brutalist-interactive transition-all group opacity-75">
+<div class="w-16 h-16 bg-surface-container-highest brutalist-border-sm flex-shrink-0 relative overflow-hidden filter grayscale">
+<span class="material-symbols-outlined absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-outline">image</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-lg text-outline uppercase truncate line-through">Success Kid (2012)</h4>
+<div class="flex gap-2 mt-1">
+<span class="bg-surface-bright text-outline px-2 py-0.5 text-[10px] font-label-sm uppercase brutalist-border-sm">ARCHIVED</span>
+</div>
+<p class="text-xs text-outline-variant font-mono mt-1">ID: MEME-008</p>
+</div>
+<div class="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="bg-surface text-primary brutalist-border-sm px-2 py-1 font-label-sm uppercase hover:bg-primary hover:text-on-primary transition-colors text-[10px]"><span class="material-symbols-outlined text-[14px]">restore</span></button>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Pane: Add/Edit Form -->
+<section class="w-full lg:w-1/2 bg-surface-container brutalist-border brutalist-shadow-black-lg p-6 flex flex-col gap-stack-md relative">
+<div class="absolute top-0 right-0 bg-secondary text-on-secondary font-label-lg uppercase px-4 py-1 brutalist-border-sm translate-x-2 -translate-y-2">EDIT MODE</div>
+<h3 class="font-headline-lg text-primary uppercase mb-4 border-b-4 border-primary inline-block self-start pb-1">Edit Meme</h3>
+<!-- Media Input Zone -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm uppercase text-secondary">Media Asset</label>
+<div class="flex gap-4">
+<div class="w-1/3 aspect-square border-4 border-dashed border-outline-variant flex flex-col items-center justify-center text-outline-variant hover:border-primary hover:text-primary transition-colors cursor-pointer bg-surface">
+<span class="material-symbols-outlined text-4xl mb-2">upload_file</span>
+<span class="font-label-sm text-center px-2">DROP FILE HERE</span>
+</div>
+<div class="w-2/3 flex flex-col gap-4">
+<div class="flex flex-col gap-1">
+<label class="text-xs font-label-sm uppercase text-outline">Media URL</label>
+<input class="brutalist-input brutalist-border-sm bg-surface p-2 text-on-surface font-mono text-sm w-full transition-all" type="text" value="https://storage.memecapsule.io/doge.jpg"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-xs font-label-sm uppercase text-outline">Thumbnail Generator</label>
+<button class="bg-surface-bright brutalist-border-sm py-2 font-label-lg uppercase text-on-surface hover:bg-primary hover:text-on-primary transition-colors w-full brutalist-interactive">GENERATE THUMB</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Basic Metadata Grid -->
+<div class="grid grid-cols-2 gap-4 mt-4">
+<div class="flex flex-col gap-1 col-span-2">
+<label class="font-label-sm uppercase text-secondary">Title</label>
+<input class="brutalist-input brutalist-border-sm bg-surface p-3 text-on-surface font-headline-md uppercase w-full transition-all" type="text" value="Doge To The Moon"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm uppercase text-secondary">Category</label>
+<select class="brutalist-input brutalist-border-sm bg-surface p-2 text-on-surface font-label-lg uppercase w-full transition-all appearance-none cursor-pointer">
+<option>Classic</option>
+<option>Crypto</option>
+<option>Reaction</option>
+<option>Surreal</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm uppercase text-secondary">Status</label>
+<select class="brutalist-input brutalist-border-sm bg-surface p-2 text-secondary font-label-lg uppercase w-full transition-all appearance-none cursor-pointer">
+<option>Active</option>
+<option>Draft</option>
+<option>Archived</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm uppercase text-secondary">Rarity</label>
+<select class="brutalist-input brutalist-border-sm bg-surface p-2 text-tertiary-container font-label-lg uppercase w-full transition-all appearance-none cursor-pointer">
+<option>Common</option>
+<option>Rare</option>
+<option>Legendary</option>
+<option>Mythic</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm uppercase text-secondary">Initial Likes</label>
+<input class="brutalist-input brutalist-border-sm bg-surface p-2 text-on-surface font-mono w-full transition-all" type="number" value="12400"/>
+</div>
+</div>
+<!-- Advanced Options -->
+<div class="mt-4 border-t-2 border-dashed border-outline-variant pt-4">
+<details class="group cursor-pointer">
+<summary class="font-label-lg text-outline uppercase flex items-center gap-2 list-none marker:hidden">
+<span class="material-symbols-outlined group-open:rotate-90 transition-transform">chevron_right</span>
+                                Advanced Options
+                            </summary>
+<div class="mt-4 grid grid-cols-1 gap-4 bg-surface p-4 brutalist-border-sm">
+<div class="flex flex-col gap-1">
+<label class="text-xs font-label-sm uppercase text-outline">Tags (Comma separated)</label>
+<input class="brutalist-input border-2 border-outline-variant bg-transparent p-2 text-on-surface font-body-sm w-full focus:border-primary" type="text" value="doge, shiba, crypto, moon"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-xs font-label-sm uppercase text-outline">Storage Path Override</label>
+<input class="brutalist-input border-2 border-outline-variant bg-transparent p-2 text-on-surface font-mono text-sm w-full focus:border-primary" placeholder="/legacy/v1/memes/" type="text"/>
+</div>
+</div>
+</details>
+</div>
+<!-- Actions -->
+<div class="mt-auto pt-6 flex gap-4">
+<button class="flex-1 bg-secondary text-on-secondary font-headline-md uppercase py-4 brutalist-border brutalist-shadow-black brutalist-interactive transition-all tracking-widest hover:bg-primary hover:text-on-primary">
+                            SAVE MEME
+                        </button>
+<button class="bg-surface text-outline font-label-lg uppercase px-6 brutalist-border-sm hover:text-error hover:border-error transition-colors">
+                            CLEAR
+                        </button>
+</div>
+</section>
+</div>
+</main>
+</div>
+<!-- Responsive Bottom Nav (Hidden on Desktop, keeping structure for potential mobile view if needed later, though prompt asks for desktop optimized) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-highest border-t-4 border-black z-50 flex justify-around items-center h-20 px-2 style_shadows_and_elevation_bottomnav">
+<!-- Vault (Active) -->
+<div class="bg-secondary text-on-secondary border-2 border-black flex flex-col items-center justify-center p-2 rounded-none flex-1 mx-1 h-14">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-sm uppercase text-[10px] mt-1">Vault</span>
+</div>
+<!-- Editor (Inactive) -->
+<div class="text-on-surface-variant flex flex-col items-center justify-center p-2 flex-1 mx-1 h-14">
+<span class="material-symbols-outlined">add_box</span>
+<span class="font-label-sm uppercase text-[10px] mt-1">Editor</span>
+</div>
+<!-- Stats (Inactive) -->
+<div class="text-on-surface-variant flex flex-col items-center justify-center p-2 flex-1 mx-1 h-14">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-sm uppercase text-[10px] mt-1">Stats</span>
+</div>
+<!-- Admin (Inactive) -->
+<div class="text-on-surface-variant flex flex-col items-center justify-center p-2 flex-1 mx-1 h-14">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-sm uppercase text-[10px] mt-1">Admin</span>
+</div>
+</nav>
+<style>
+        /* Custom Scrollbar for glitch/arcade feel */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #131313;
+            border-left: 2px solid #353534;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #dcb8ff;
+            border: 2px solid #131313;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #f4c300;
+        }
+    </style>
+</body></html>

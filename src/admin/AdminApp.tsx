@@ -334,291 +334,283 @@ export default function AdminApp() {
 
   return (
     <main className="admin-shell">
-      <section className="admin-hero">
-        <div>
-          <p className="admin-eyebrow">Meme Capsule Admin</p>
-          <h1>Curate the collection without touching code.</h1>
-          <p className="admin-copy">
-            Add memes by URL, local upload, or Google Drive link. Mark items active only after review.
-          </p>
+      <header className="top-app-bar">
+        <div className="title-area">
+          <span className="material-symbols-outlined">menu</span>
+          <span className="title-text">MEME CAPSULE ADMIN</span>
         </div>
-        <div className="admin-actions">
-          <a href="#add-meme">
-            <ImagePlus size={18} aria-hidden="true" />
-            Add Meme to Collection
-          </a>
-          <a href="#collection">
-            <ListChecks size={18} aria-hidden="true" />
-            View Meme Collection
-          </a>
-        </div>
-      </section>
-
-      <section className="admin-stats" aria-label="Collection status">
-        <div className={`mode-badge ${backendMode ? "is-backend" : "is-local"}`}>
-          {backendMode ? "BACKEND MODE" : "LOCAL MODE"}
-        </div>
-        <span>{stats.total} total</span>
-        <span>{stats.active} active</span>
-        <span>{stats.drafts} drafts</span>
-        <span>{stats.archived} archived</span>
-      </section>
-
-      <section className="admin-panel backend-panel" aria-label="Backend connection">
-        <div>
-            Local mode is for quick testing. Backend mode uses Cloudflare Pages Functions, R2 Storage,
-            and the D1 `memes` table.
-        </div>
-
-        {backendMode && !backendConfig.hasR2PublicUrl && (
-          <div className="admin-warning" style={{ background: "rgba(255, 95, 95, 0.1)", borderLeft: "4px solid #ff5f5f" }}>
-            <strong style={{ color: "#ff5f5f" }}>⚠️ Missing R2_PUBLIC_URL</strong>
-            <p>
-              The backend is missing the public URL for your R2 bucket. Memes uploaded to R2 will not load in the main app until you add <code>R2_PUBLIC_URL</code> to your Cloudflare Pages environment variables.
-            </p>
+        <div className="header-actions">
+          <div className="backend-pill">
+            <span>{backendMode ? "BACKEND MODE" : "LOCAL MODE"}</span>
+            <div className={`status-dot ${backendMode ? 'active' : ''}`}></div>
           </div>
-        )}
-
-        {backendMode && stats.active === 0 && stats.total > 0 && (
-          <div className="admin-warning" style={{ background: "rgba(255, 204, 77, 0.1)", borderLeft: "4px solid #ffcc4d" }}>
-            <strong style={{ color: "#ffcc4d" }}>💡 Tip: Activate your memes</strong>
-            <p>
-              You have {stats.total} memes in the database, but 0 are set to <strong>Active</strong>. The main app only shows memes with "Active" status. Edit your memes below and change their status.
-            </p>
+          <div className="token-input">
+            <span className="material-symbols-outlined">key</span>
+            <input
+              type="password"
+              placeholder="API TOKEN..."
+              value={adminToken}
+              onChange={(e) => setAdminToken(e.target.value)}
+            />
           </div>
-        )}
-        <label>
-          <span>Admin API token</span>
-          <input
-            value={adminToken}
-            onChange={(event) => setAdminToken(event.target.value)}
-            placeholder="Matches ADMIN_API_TOKEN in Cloudflare"
-            type="password"
-          />
-        </label>
-        <div className="backend-actions">
-          <button type="button" onClick={saveToken} disabled={isSyncing}>
-            Save Token
-          </button>
-          <button type="button" onClick={loadBackend} disabled={isSyncing}>
-            Load Backend Collection
-          </button>
-          {backendMode && (
-            <button type="button" onClick={handleSyncR2} disabled={isSyncing}>
-              <RefreshCw size={16} aria-hidden="true" />
-              {isSyncing ? "Syncing..." : "Sync R2 Files to D1"}
-            </button>
-          )}
-          <button type="button" onClick={useLocalMode} disabled={isSyncing}>
-            Use Local Drafts
+          <button onClick={adminToken ? loadBackend : saveToken} className="icon-btn brutalist-interactive" title="Sync / Load Backend" style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>
+            <span className="material-symbols-outlined">sync</span>
           </button>
         </div>
-      </section>
+      </header>
 
-      <section className="admin-grid">
-        <form id="add-meme" className="admin-panel admin-form" onSubmit={handleSubmit}>
-          <div className="panel-heading">
-            <Database size={20} aria-hidden="true" />
-            <div>
-              <h2>{editingOriginalId ? "Edit Meme Details" : "Add Meme to Collection"}</h2>
-              <p>{notice}</p>
+      <div className="main-layout">
+        <nav className="nav-drawer">
+          <h2>ADMIN CONSOLE</h2>
+          <ul>
+            <li className="active">
+              <span className="material-symbols-outlined">dashboard</span>
+              Dashboard
+            </li>
+            <li onClick={useLocalMode}>
+              <span className="material-symbols-outlined">inventory_2</span>
+              Use Local Drafts
+            </li>
+            <li onClick={backendMode ? handleSyncR2 : undefined} style={{ opacity: backendMode ? 1 : 0.5 }}>
+              <span className="material-symbols-outlined">refresh</span>
+              Sync R2 Files
+            </li>
+          </ul>
+          <div className="sys-status">
+            <p>SYSTEM UPTIME: 99.9%</p>
+            <p>VERSION: 2.4.1-BETA</p>
+          </div>
+        </nav>
+
+        <div className="content-canvas">
+          <section className="top-stats-bar">
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
+              <p>Total Memes</p>
+              <p className="stat-value total">{stats.total}</p>
             </div>
-          </div>
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
+              <p>Active</p>
+              <p className="stat-value active">{stats.active}</p>
+            </div>
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
+              <p>Drafts</p>
+              <p className="stat-value drafts">{stats.drafts}</p>
+            </div>
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
+              <p>Archived</p>
+              <p className="stat-value archived">{stats.archived}</p>
+            </div>
+          </section>
 
-          <div className="input-mode-grid simplified">
-            <label className="url-input-zone">
-              <span>Media URL (Direct link or Google Drive)</span>
-              <input
-                value={form.url}
-                onChange={(event) => handleUrlInput(event.target.value.includes("drive.google") ? "google-drive" : "url", event.target.value)}
-                placeholder="https://..."
-              />
-            </label>
-            <label className="file-drop">
-              <UploadCloud size={20} aria-hidden="true" />
-              <span>Upload File</span>
-              <input accept="image/*,video/*" type="file" onChange={handleFileUpload} />
-            </label>
-          </div>
-
-          <div className="field-grid">
-            <label>
-              <span>Name / title</span>
-              <input
-                value={form.title}
-                onChange={(event) => updateForm("title", event.target.value)}
-                placeholder="Exam week survival"
-              />
-            </label>
-            <label>
-              <span>Category</span>
-              <input
-                value={form.category}
-                onChange={(event) => updateForm("category", event.target.value)}
-                placeholder="College"
-              />
-            </label>
-            <label>
-              <span>Status</span>
-              <select
-                value={form.status}
-                onChange={(event) => updateForm("status", event.target.value as MemeStatus)}
-              >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-              </select>
-            </label>
-            <label>
-              <span>Rarity</span>
-              <select
-                value={form.rarity}
-                onChange={(event) => updateForm("rarity", event.target.value as Rarity)}
-              >
-                <option value="Common">Common</option>
-                <option value="Rare">Rare</option>
-                <option value="Legendary">Legendary</option>
-              </select>
-            </label>
-            <label>
-              <span>Likes Count</span>
-              <input
-                type="number"
-                value={form.likes_count ?? 0}
-                onChange={(event) => updateForm("likes_count", Number(event.target.value))}
-              />
-            </label>
-
-            {showAdvanced && (
-              <>
-                <label>
-                  <span>Meme ID</span>
-                  <input value={form.id} onChange={(event) => updateForm("id", event.target.value)} />
-                </label>
-                <label>
-                  <span>Tags</span>
-                  <input
-                    value={form.tags}
-                    onChange={(event) => updateForm("tags", event.target.value)}
-                    placeholder="college, exam, relatable"
-                  />
-                </label>
-                <label className="wide-field">
-                  <span>Storage path</span>
-                  <input
-                    value={form.storage_path || ""}
-                    onChange={(event) => updateForm("storage_path", event.target.value)}
-                    placeholder="Cloudflare path, filled after backend upload"
-                  />
-                </label>
-                <label className="wide-field">
-                  <span>Share text</span>
-                  <input
-                    value={form.share_text}
-                    onChange={(event) => updateForm("share_text", event.target.value)}
-                    placeholder="Send this to the group chat"
-                  />
-                </label>
-                <label className="wide-field">
-                  <span>Rights note</span>
-                  <input
-                    value={form.rights_note}
-                    onChange={(event) => updateForm("rights_note", event.target.value)}
-                    placeholder="original / licensed / permission / reviewed"
-                  />
-                </label>
-              </>
-            )}
-          </div>
-
-          <div className="advanced-toggle" style={{ marginTop: '12px', textAlign: 'right' }}>
-            <button type="button" className="ghost-action" onClick={() => setShowAdvanced(!showAdvanced)} style={{ fontSize: '0.85rem', padding: '6px 12px', minHeight: 'auto' }}>
-              {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
-            </button>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit">
-              <Save size={18} aria-hidden="true" />
-              {editingOriginalId ? "Save Changes" : backendMode ? "Add Meme to Backend" : "Add Meme to Collection"}
-            </button>
-            <button type="button" className="ghost-action" onClick={resetForm}>
-              {editingOriginalId ? "Cancel Editing" : "Clear Form"}
-            </button>
-            <button type="button" className="ghost-action" onClick={exportCollection}>
-              <Download size={18} aria-hidden="true" />
-              Export JSON
-            </button>
-          </div>
-        </form>
-
-        <aside className="admin-panel preview-panel">
-          <h2>Preview</h2>
-          {form.url ? (
-            form.media_type === "video" ? (
-              <video controls src={form.url} />
-            ) : (
-              <img src={form.url} alt={form.title || "Meme preview"} />
-            )
-          ) : (
-            <div className="preview-empty">No meme selected yet.</div>
+          {notice && (
+            <div className="brutalist-border-sm" style={{ padding: '12px', background: 'var(--surface-container-highest)', color: 'var(--primary)', fontFamily: 'monospace' }}>
+              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>info</span>
+              {notice}
+            </div>
           )}
-        </aside>
-      </section>
 
-      <section id="collection" className="admin-panel collection-panel">
-        <div className="panel-heading">
-          <ListChecks size={20} aria-hidden="true" />
-          <div>
-            <h2>View Meme Collection</h2>
-            <p>Active items are eligible for local app testing. Drafts and archived items stay hidden.</p>
-          </div>
-        </div>
-
-        <div className="collection-table">
-          {collection.length === 0 ? (
-            <div className="empty-collection">No admin memes yet. Add one above.</div>
-          ) : (
-            collection.map((meme) => (
-              <article 
-                className={`collection-row ${meme.id === editingOriginalId ? "is-editing" : ""}`} 
-                key={meme.id} 
-                onClick={() => editMeme(meme)}
-              >
-                <div className="thumb">
-                  {meme.media_type === "video" ? (
-                    <video src={meme.url} muted />
-                  ) : (
-                    <img src={meme.url} alt={meme.title} />
-                  )}
-                </div>
-                <div className="collection-meta">
-                  <strong>{meme.title}</strong>
-                  <span>{meme.id}</span>
-                  <span>{meme.category} / {meme.status}</span>
-                  <span>Likes: {meme.likes_count ?? 0}</span>
-                  <span>{new Date(meme.uploaded_at).toLocaleDateString()}</span>
-                  <a href={meme.source_link || meme.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                    <LinkIcon size={14} aria-hidden="true" />
-                    Source link
-                    <ExternalLink size={13} aria-hidden="true" />
-                  </a>
-                </div>
-                <div className="row-actions">
-                  <button type="button" onClick={(e) => { e.stopPropagation(); editMeme(meme); }}>
-                    <Edit3 size={17} aria-hidden="true" />
-                    Edit
+          <div className="split-pane">
+            {/* LEFT PANE - VAULT */}
+            <section className="left-pane">
+              <div className="pane-header">
+                <h3>Meme Vault</h3>
+                <div className="filter-actions">
+                  <button className="filter-btn brutalist-border-sm brutalist-interactive">
+                    <span className="material-symbols-outlined">filter_list</span>
                   </button>
-                  <button type="button" className="delete-action" onClick={(e) => { e.stopPropagation(); deleteMeme(meme.id); }}>
-                    <Trash2 size={17} aria-hidden="true" />
-                    {backendMode ? "Archive" : "Delete"}
+                  <button className="filter-btn brutalist-border-sm brutalist-interactive">
+                    <span className="material-symbols-outlined">sort</span>
                   </button>
                 </div>
-              </article>
-            ))
-          )}
+              </div>
+              <div className="collection-list custom-scrollbar">
+                {collection.length === 0 && (
+                  <div style={{ color: 'var(--outline-variant)', padding: '16px' }}>No admin memes yet.</div>
+                )}
+                {collection.map((meme) => (
+                  <div key={meme.id} className="collection-row brutalist-border brutalist-shadow-black brutalist-interactive" onClick={() => editMeme(meme)}>
+                    <div className="thumb brutalist-border-sm">
+                      {meme.media_type === 'video' ? (
+                        <video src={meme.url} muted />
+                      ) : (
+                        <img src={meme.url} alt={meme.title} />
+                      )}
+                      <div className="overlay"></div>
+                      {!meme.url && <span className="material-symbols-outlined" style={{ zIndex: 2 }}>image</span>}
+                    </div>
+                    <div className="collection-meta">
+                      <h4 style={{ textDecoration: meme.status === 'archived' ? 'line-through' : 'none' }}>{meme.title || "Untitled Meme"}</h4>
+                      <div className="badge-row">
+                        <span className={`badge brutalist-border-sm ${meme.status}`}>{meme.status}</span>
+                        <span className="likes-count">
+                          <span className="material-symbols-outlined">favorite</span> {meme.likes_count ?? 0}
+                        </span>
+                      </div>
+                      <p className="row-id">ID: {meme.id}</p>
+                    </div>
+                    <div className="row-actions">
+                      <button type="button" className="brutalist-border-sm" onClick={(e) => { e.stopPropagation(); editMeme(meme); }}>
+                        <span className="material-symbols-outlined">edit</span> Edit
+                      </button>
+                      <button type="button" className="delete-btn brutalist-border-sm" onClick={(e) => { e.stopPropagation(); deleteMeme(meme.id); }}>
+                        <span className="material-symbols-outlined">{backendMode ? "restore" : "delete"}</span> 
+                        {backendMode ? "Archv" : "Del"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* RIGHT PANE - EDITOR */}
+            <section className="right-pane brutalist-border brutalist-shadow-black-lg">
+              {editingOriginalId && <div className="edit-mode-tag brutalist-border-sm">EDIT MODE</div>}
+              <h3>{editingOriginalId ? "Edit Meme" : "Add Meme"}</h3>
+              
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>Media Asset</label>
+                  <div className="media-zone">
+                    <label className="file-dropzone">
+                      <span className="material-symbols-outlined">upload_file</span>
+                      <span>DROP FILE HERE</span>
+                      <input accept="image/*,video/*" type="file" onChange={handleFileUpload} />
+                    </label>
+                    <div className="url-zone">
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Media URL</label>
+                        <input 
+                          className="brutalist-input" 
+                          style={{ fontFamily: 'monospace' }} 
+                          value={form.url} 
+                          onChange={(e) => handleUrlInput(e.target.value.includes("drive.google") ? "google-drive" : "url", e.target.value)} 
+                          placeholder="https://..." 
+                        />
+                      </div>
+                      {form.url && (
+                        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center' }}>
+                          {form.media_type === "video" ? (
+                            <video controls src={form.url} style={{ maxHeight: '100px', border: '2px solid var(--outline-variant)' }} />
+                          ) : (
+                            <img src={form.url} alt="Preview" style={{ maxHeight: '100px', border: '2px solid var(--outline-variant)' }} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="metadata-grid">
+                  <div className="form-group col-span-2">
+                    <label>Title</label>
+                    <input 
+                      className="brutalist-input" 
+                      style={{ fontFamily: 'var(--font-display)', fontSize: '20px', textTransform: 'uppercase' }} 
+                      value={form.title} 
+                      onChange={(e) => updateForm("title", e.target.value)} 
+                      placeholder="Exam week survival"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Category</label>
+                    <input 
+                      className="brutalist-input" 
+                      style={{ textTransform: 'uppercase', fontWeight: 700 }}
+                      value={form.category} 
+                      onChange={(e) => updateForm("category", e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select 
+                      className="brutalist-input" 
+                      style={{ textTransform: 'uppercase', fontWeight: 700, color: 'var(--secondary)' }}
+                      value={form.status} 
+                      onChange={(e) => updateForm("status", e.target.value as MemeStatus)}
+                    >
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Rarity</label>
+                    <select 
+                      className="brutalist-input" 
+                      style={{ textTransform: 'uppercase', fontWeight: 700, color: 'var(--tertiary-container)' }}
+                      value={form.rarity} 
+                      onChange={(e) => updateForm("rarity", e.target.value as Rarity)}
+                    >
+                      <option value="Common">Common</option>
+                      <option value="Rare">Rare</option>
+                      <option value="Legendary">Legendary</option>
+                      <option value="Mythic">Mythic</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Likes Count</label>
+                    <input 
+                      type="number"
+                      className="brutalist-input" 
+                      style={{ fontFamily: 'monospace' }}
+                      value={form.likes_count ?? 0} 
+                      onChange={(e) => updateForm("likes_count", Number(e.target.value))} 
+                    />
+                  </div>
+                </div>
+
+                <div className="advanced-toggle">
+                  <details className="group cursor-pointer">
+                    <summary className="advanced-summary" onClick={(e) => {
+                      e.preventDefault();
+                      setShowAdvanced(!showAdvanced);
+                    }}>
+                      <span className="material-symbols-outlined" style={{ transform: showAdvanced ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>chevron_right</span>
+                      Advanced Options
+                    </summary>
+                    {showAdvanced && (
+                      <div className="advanced-content brutalist-border-sm">
+                        <div className="form-group">
+                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Meme ID</label>
+                          <input className="brutalist-input" value={form.id} onChange={(e) => updateForm("id", e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Tags (Comma separated)</label>
+                          <input className="brutalist-input" value={form.tags} onChange={(e) => updateForm("tags", e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Storage Path</label>
+                          <input className="brutalist-input" value={form.storage_path || ""} onChange={(e) => updateForm("storage_path", e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Share Text</label>
+                          <input className="brutalist-input" value={form.share_text} onChange={(e) => updateForm("share_text", e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Rights Note</label>
+                          <input className="brutalist-input" value={form.rights_note} onChange={(e) => updateForm("rights_note", e.target.value)} />
+                        </div>
+                        <button type="button" onClick={exportCollection} className="btn-clear brutalist-border-sm" style={{ padding: '8px', color: 'var(--primary)', borderColor: 'var(--primary)', marginTop: '8px', width: 'fit-content' }}>
+                          Export JSON
+                        </button>
+                      </div>
+                    )}
+                  </details>
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive">
+                    {editingOriginalId ? "Save Changes" : "Save Meme"}
+                  </button>
+                  <button type="button" className="btn-clear brutalist-border-sm" onClick={resetForm}>
+                    Clear
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
