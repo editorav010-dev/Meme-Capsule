@@ -10,3 +10,16 @@ database_id = "64e2bb16-1557-4d53-8e6b-5197c8636d09"
 [[r2_buckets]]
 binding = "MEMES_BUCKET"
 bucket_name = "memes"
+
+# Analytics KV cache namespace
+# Create with: npx wrangler kv:namespace create "ANALYTICS_KV"
+# Then replace the id below with the output
+# [[kv_namespaces]]
+# binding = "ANALYTICS_KV"
+# id = "<YOUR_KV_NAMESPACE_ID>"
+# preview_id = "<YOUR_KV_PREVIEW_ID>"
+
+# Cron trigger for analytics aggregation worker
+# Uncomment after deploying the worker separately
+# [triggers]
+# crons = ["*/30 * * * *"]

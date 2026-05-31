@@ -12,6 +12,7 @@ import { getActiveAdminMemes } from "./lib/adminCollection";
 import { fetchLikeCount, getDailyMeme, getRandomMeme, toggleLikeMeme } from "./lib/memeApi";
 import { readJson, writeJson } from "./lib/localState";
 import { saveMeme, shareMeme } from "./lib/share";
+import { useAnalytics } from "./analytics";
 import type { Meme } from "./types";
 
 const FAVORITES_KEY = "meme-capsule:favorites";
@@ -36,6 +37,8 @@ export default function App() {
   const [notice, setNotice] = useState("Ready when you are.");
   const [revealKey, setRevealKey] = useState(0);
 
+  const { trackEvent } = useAnalytics();
+
   const likedSet = useMemo(() => new Set(likedMemes), [likedMemes]);
   const currentReactionCount = currentMeme ? reactions[currentMeme.id] ?? 0 : 0;
 
@@ -55,6 +58,7 @@ export default function App() {
     setCurrentMeme(meme);
     setRevealKey((key) => key + 1);
     setNotice(message);
+    trackEvent(meme.id, "view");
 
     // Always fetch the real like count from the backend
     fetchLikeCount(meme.id).then((count) => {
@@ -63,6 +67,9 @@ export default function App() {
   };
 
   const spawnRandom = async () => {
+    if (currentMeme) {
+      trackEvent(currentMeme.id, "skip");
+    }
     setIsLoading(true);
     setNotice("Shaking the capsule...");
 
@@ -91,6 +98,7 @@ export default function App() {
 
     const isLiked = likedSet.has(currentMeme.id);
     const action = isLiked ? "unlike" : "like";
+    trackEvent(currentMeme.id, action);
 
     try {
       // Optimistic update locally
@@ -140,6 +148,7 @@ export default function App() {
 
     try {
       const result = await shareMeme(currentMeme);
+      trackEvent(currentMeme.id, "share");
       setNotice(result === "copied" ? "Share text copied." : "Share sheet opened.");
     } catch {
       setNotice("Sharing was cancelled.");
@@ -152,6 +161,7 @@ export default function App() {
     }
 
     await saveMeme(currentMeme);
+    trackEvent(currentMeme.id, "download");
     setNotice("Meme saved.");
   };
 

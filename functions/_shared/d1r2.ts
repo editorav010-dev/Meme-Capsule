@@ -6,6 +6,7 @@ export type Env = {
   MEMES_BUCKET: R2Bucket;
   ADMIN_API_TOKEN?: string;
   R2_PUBLIC_URL?: string;
+  ANALYTICS_KV?: KVNamespace;
 };
 
 export type D1MemeRow = {
