@@ -12,12 +12,10 @@ binding = "MEMES_BUCKET"
 bucket_name = "memes"
 
 # Analytics KV cache namespace
-# Create with: npx wrangler kv:namespace create "ANALYTICS_KV"
-# Then replace the id below with the output
-# [[kv_namespaces]]
-# binding = "ANALYTICS_KV"
-# id = "<YOUR_KV_NAMESPACE_ID>"
-# preview_id = "<YOUR_KV_PREVIEW_ID>"
+# Created via Cloudflare dashboard
+[[kv_namespaces]]
+binding = "ANALYTICS_KV"
+id = "078fce53803845b3a47751baef405341"
 
 # Cron trigger for analytics aggregation worker
 # Uncomment after deploying the worker separately
