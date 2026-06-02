@@ -31,6 +31,7 @@ import {
 } from "../lib/adminCollection";
 import type { MemeInputMethod, MemeStatus, Rarity } from "../types";
 import AnalyticsDashboard from "./analytics-dashboard/AnalyticsDashboard";
+import SqlRunner from "./sql-runner/SqlRunner";
 import "./admin.css";
 
 type FormState = Omit<AdminMeme, "tags"> & {
@@ -62,7 +63,7 @@ export default function AdminApp() {
   const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
   const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeTab, setActiveTab] = useState<"vault" | "analytics">("vault");
+  const [activeTab, setActiveTab] = useState<"vault" | "analytics" | "sql">("vault");
 
   useEffect(() => {
     if (adminToken.trim()) {
@@ -373,6 +374,10 @@ export default function AdminApp() {
               <span className="material-symbols-outlined">query_stats</span>
               Analytics
             </li>
+            <li className={activeTab === 'sql' ? "active" : ""} onClick={() => setActiveTab('sql')}>
+              <span className="material-symbols-outlined">terminal</span>
+              SQL Playground
+            </li>
             <li onClick={useLocalMode}>
               <span className="material-symbols-outlined">inventory_2</span>
               Use Local Drafts
@@ -418,6 +423,10 @@ export default function AdminApp() {
           {activeTab === 'analytics' ? (
             <div style={{ background: 'var(--background)', flex: 1, minHeight: '600px' }} className="brutalist-border brutalist-shadow-black">
               <AnalyticsDashboard adminToken={adminToken} />
+            </div>
+          ) : activeTab === 'sql' ? (
+            <div style={{ background: 'var(--background)', flex: 1, minHeight: '600px' }} className="brutalist-border brutalist-shadow-black">
+              <SqlRunner adminToken={adminToken} />
             </div>
           ) : (
             <div className="split-pane">
