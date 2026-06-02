@@ -52,6 +52,38 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!results || results.length === 0) return;
+    
+    const columns = Object.keys(results[0]);
+    const headerRow = columns.map(col => `"${col.replace(/"/g, '""')}"`).join(",");
+    
+    const dataRows = results.map(row => {
+      return columns.map(col => {
+        let val = row[col];
+        if (typeof val === "object" && val !== null) {
+          val = JSON.stringify(val);
+        } else if (val === null) {
+          val = "NULL";
+        } else {
+          val = String(val);
+        }
+        val = val.replace(/"/g, '""');
+        return `"${val}"`;
+      }).join(",");
+    });
+    
+    const csvContent = [headerRow, ...dataRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `sql_export_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const renderTable = () => {
     if (!results) return null;
     if (results.length === 0) {
@@ -62,7 +94,7 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
 
     return (
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "var(--on-surface)" }}>
           <thead>
             <tr>
               {columns.map((col) => (
@@ -71,9 +103,9 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
                   style={{
                     padding: "12px",
                     textAlign: "left",
-                    background: "var(--surface-variant)",
+                    background: "var(--surface-container-high)",
                     borderBottom: "2px solid var(--outline)",
-                    color: "var(--on-surface-variant)",
+                    color: "var(--on-surface)",
                     fontWeight: 700,
                   }}
                 >
@@ -101,10 +133,10 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", color: "var(--on-surface)" }}>
       {/* Header Area */}
-      <div style={{ padding: "24px", borderBottom: "2px solid var(--outline)", background: "var(--surface)" }}>
-        <h2 style={{ margin: "0 0 8px 0", fontSize: "24px", textTransform: "uppercase" }}>SQL Playground</h2>
+      <div style={{ padding: "24px", borderBottom: "4px solid black", background: "var(--surface-container)" }}>
+        <h2 style={{ margin: "0 0 8px 0", fontSize: "24px", textTransform: "uppercase", color: "var(--on-surface)" }}>SQL Playground</h2>
         <p style={{ margin: 0, color: "var(--outline)", fontSize: "14px" }}>
           Execute raw D1 queries directly. Note: D1 limits payload sizes. Use LIMIT for large tables.
         </p>
@@ -119,6 +151,9 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
               fontSize: "16px",
               padding: "16px",
               resize: "vertical",
+              background: "var(--surface-container-lowest)",
+              color: "var(--on-surface)",
+              border: "2px solid black"
             }}
             placeholder="SELECT * FROM memes LIMIT 10;"
             value={query}
@@ -139,7 +174,24 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
             >
               {loading ? "Executing..." : "Run Query"}
             </button>
-            <span style={{ fontSize: "12px", color: "var(--outline)" }}>Cmd/Ctrl + Enter</span>
+            <span style={{ fontSize: "12px", color: "var(--outline)", marginRight: "auto" }}>Cmd/Ctrl + Enter</span>
+            
+            {results && results.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                className="brutalist-border brutalist-shadow-black brutalist-interactive"
+                style={{ 
+                  background: "var(--tertiary-container)", 
+                  color: "var(--on-tertiary-container)", 
+                  padding: "12px 24px", 
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  textTransform: "uppercase"
+                }}
+              >
+                Export CSV
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -147,7 +199,7 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
       {/* Results Area */}
       <div style={{ flex: 1, overflow: "auto", background: "var(--background)", padding: "24px" }} className="custom-scrollbar">
         {error && (
-          <div style={{ padding: "16px", background: "var(--error-container)", color: "var(--on-error-container)", border: "2px solid var(--error)", fontWeight: 700 }}>
+          <div style={{ padding: "16px", background: "var(--error-container)", color: "var(--on-error-container)", border: "2px solid var(--error)", fontWeight: 700, marginBottom: "16px" }}>
             <div style={{ fontSize: "12px", textTransform: "uppercase", opacity: 0.8, marginBottom: "4px" }}>Execution Error</div>
             {error}
           </div>
@@ -162,7 +214,7 @@ export default function SqlRunner({ adminToken }: SqlRunnerProps) {
           </div>
         )}
 
-        <div className="brutalist-border-sm" style={{ background: "var(--surface)", minHeight: "200px" }}>
+        <div className="brutalist-border-sm" style={{ background: "var(--surface-container-lowest)", minHeight: "200px" }}>
           {renderTable()}
           {!results && !loading && !error && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px", color: "var(--outline-variant)" }}>
