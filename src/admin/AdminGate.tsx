@@ -46,10 +46,7 @@ export default function AdminGate({ children }: AdminGateProps) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      minHeight: "100vh",
-      background: "var(--background)",
-      color: "var(--on-background)",
-      fontFamily: "var(--font-sans)"
+      minHeight: "100vh"
     }}>
       <form 
         onSubmit={handleSubmit}

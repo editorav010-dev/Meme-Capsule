@@ -6,7 +6,11 @@ import App from "./App";
 import "./styles.css";
 
 const Root = window.location.pathname.startsWith("/admin") 
-  ? () => <AdminGate><AdminApp /></AdminGate> 
+  ? () => (
+      <div className="admin-theme" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--on-surface)" }}>
+        <AdminGate><AdminApp /></AdminGate>
+      </div>
+    )
   : App;
 
 createRoot(document.getElementById("root")!).render(
