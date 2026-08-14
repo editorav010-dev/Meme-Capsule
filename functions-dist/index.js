@@ -823,6 +823,68 @@ var onRequestPost = /* @__PURE__ */ __name(async ({ request, env }) => {
   }
 }, "onRequestPost");
 
+// api/admin/analytics/reset.ts
+var onRequestPost2 = /* @__PURE__ */ __name(async ({ request, env }) => {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+  const startTime = Date.now();
+  try {
+    const memesCountResult = await env.DB.prepare(
+      "SELECT COUNT(*) as cnt FROM memes WHERE is_active = 1"
+    ).first();
+    const totalMemes = memesCountResult?.cnt ?? 0;
+    const now = Date.now();
+    const statements = [
+      env.DB.prepare("DELETE FROM meme_events"),
+      env.DB.prepare("DELETE FROM meme_analytics"),
+      env.DB.prepare("DELETE FROM meme_daily_stats"),
+      env.DB.prepare("DELETE FROM app_global_stats"),
+      env.DB.prepare(
+        `INSERT INTO app_global_stats (stat_key, stat_value, updated_at) VALUES
+          ('total_memes', ?, ?),
+          ('total_events', 0, ?),
+          ('total_views', 0, ?),
+          ('total_likes', 0, ?),
+          ('total_shares', 0, ?),
+          ('total_downloads', 0, ?),
+          ('total_skips', 0, ?),
+          ('total_unique_devices', 0, ?),
+          ('avg_session_length_ms', 0, ?),
+          ('most_active_hour', 0, ?),
+          ('last_aggregation_run', 0, ?)`
+      ).bind(
+        totalMemes,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now,
+        now
+      )
+    ];
+    await env.DB.batch(statements);
+    if (env.ANALYTICS_KV) {
+      await bustAnalyticsCache(env.ANALYTICS_KV);
+    }
+    const duration = Date.now() - startTime;
+    return json({
+      success: true,
+      message: `Analytics reset successfully in ${duration}ms. All events, scores, and rankings cleared.`,
+      duration_ms: duration,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Analytics reset error:", message);
+    return json({ error: message }, { status: 500 });
+  }
+}, "onRequestPost");
+
 // api/admin/analytics/trends.ts
 var onRequestGet5 = /* @__PURE__ */ __name(async ({ request, env }) => {
   const authError = requireAdmin(request, env);
@@ -920,7 +982,7 @@ var onRequestGet6 = /* @__PURE__ */ __name(async ({ request, env }) => {
     }
   });
 }, "onRequestGet");
-var onRequestPost2 = /* @__PURE__ */ __name(async ({ request, env }) => {
+var onRequestPost3 = /* @__PURE__ */ __name(async ({ request, env }) => {
   const adminError = requireAdmin(request, env);
   if (adminError) return adminError;
   try {
@@ -1020,8 +1082,40 @@ var onRequestDelete = /* @__PURE__ */ __name(async ({ request, env }) => {
   }
 }, "onRequestDelete");
 
+// api/admin/sql.ts
+var onRequestPost4 = /* @__PURE__ */ __name(async ({ request, env }) => {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+  let query;
+  try {
+    const body = await request.json();
+    if (!body.query || typeof body.query !== "string") {
+      return json({ success: false, error: "Missing or invalid 'query' field in request body." }, { status: 400 });
+    }
+    query = body.query.trim();
+  } catch (err) {
+    return json({ success: false, error: "Invalid JSON payload." }, { status: 400 });
+  }
+  if (query.length === 0) {
+    return json({ success: false, error: "Query cannot be empty." }, { status: 400 });
+  }
+  try {
+    const result = await env.DB.prepare(query).all();
+    return json({
+      success: true,
+      results: result.results,
+      meta: result.meta
+    });
+  } catch (err) {
+    return json({
+      success: false,
+      error: err.message || "Database execution failed."
+    });
+  }
+}, "onRequestPost");
+
 // api/admin/sync-r2.ts
-var onRequestPost3 = /* @__PURE__ */ __name(async ({ request, env }) => {
+var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
   const adminError = requireAdmin(request, env);
   if (adminError) return adminError;
   try {
@@ -1139,7 +1233,7 @@ var onRequestPost3 = /* @__PURE__ */ __name(async ({ request, env }) => {
 // api/admin/upload.ts
 var sanitizeFileName = /* @__PURE__ */ __name((name) => name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 96) || "meme-file", "sanitizeFileName");
 var mediaTypeFromMime = /* @__PURE__ */ __name((mimeType) => mimeType.startsWith("video/") ? "video" : "image", "mediaTypeFromMime");
-var onRequestPost4 = /* @__PURE__ */ __name(async ({ request, env }) => {
+var onRequestPost6 = /* @__PURE__ */ __name(async ({ request, env }) => {
   const adminError = requireAdmin(request, env);
   if (adminError) return adminError;
   const formData = await request.formData().catch(() => null);
@@ -1235,7 +1329,7 @@ var checkRateLimit = /* @__PURE__ */ __name(async (kv, deviceId) => {
   });
   return true;
 }, "checkRateLimit");
-var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
+var onRequestPost7 = /* @__PURE__ */ __name(async ({ request, env }) => {
   try {
     const body = await request.json();
     const nowMs = Date.now();
@@ -1286,7 +1380,7 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
 }, "onRequestPost");
 
 // api/like.ts
-var onRequestPost6 = /* @__PURE__ */ __name(async ({ request, env }) => {
+var onRequestPost8 = /* @__PURE__ */ __name(async ({ request, env }) => {
   try {
     const payload = await request.json();
     const { id, action } = payload;
@@ -1346,7 +1440,7 @@ var onRequestGet9 = /* @__PURE__ */ __name(async ({ env }) => {
   return json({ meme });
 }, "onRequestGet");
 
-// ../.wrangler/tmp/pages-32gY2D/functionsRoutes-0.6256028295481245.mjs
+// ../.wrangler/tmp/pages-rI7gtd/functionsRoutes-0.15369742901343575.mjs
 var routes = [
   {
     routePath: "/api/admin/analytics/meme/:memeId",
@@ -1384,6 +1478,13 @@ var routes = [
     modules: [onRequestPost]
   },
   {
+    routePath: "/api/admin/analytics/reset",
+    mountPath: "/api/admin/analytics",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost2]
+  },
+  {
     routePath: "/api/admin/analytics/trends",
     mountPath: "/api/admin/analytics",
     method: "GET",
@@ -1416,21 +1517,28 @@ var routes = [
     mountPath: "/api/admin",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost2]
+    modules: [onRequestPost3]
+  },
+  {
+    routePath: "/api/admin/sql",
+    mountPath: "/api/admin",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost4]
   },
   {
     routePath: "/api/admin/sync-r2",
     mountPath: "/api/admin",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost3]
+    modules: [onRequestPost5]
   },
   {
     routePath: "/api/admin/upload",
     mountPath: "/api/admin",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost4]
+    modules: [onRequestPost6]
   },
   {
     routePath: "/api/daily-meme",
@@ -1444,14 +1552,14 @@ var routes = [
     mountPath: "/api",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost5]
+    modules: [onRequestPost7]
   },
   {
     routePath: "/api/like",
     mountPath: "/api",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost6]
+    modules: [onRequestPost8]
   },
   {
     routePath: "/api/likes",
