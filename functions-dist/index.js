@@ -1115,9 +1115,11 @@ var onRequestPost4 = /* @__PURE__ */ __name(async ({ request, env }) => {
 }, "onRequestPost");
 
 // api/admin/sync-r2.ts
+var BATCH_SIZE = 50;
 var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
   const adminError = requireAdmin(request, env);
   if (adminError) return adminError;
+  const startTime = Date.now();
   try {
     const bucket = env.MEMES_BUCKET;
     const db = env.DB;
@@ -1126,7 +1128,7 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
     let cursor;
     let listAttempts = 0;
     do {
-      const options = { limit: 500 };
+      const options = { limit: 1e3 };
       if (cursor) options.cursor = cursor;
       const listed = await bucket.list(options);
       for (const obj of listed.objects) {
@@ -1160,31 +1162,44 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
       const ext = obj.key.slice(dotIndex).toLowerCase();
       return mediaExtensions.has(ext);
     });
-    const { results: existingRows } = await db.prepare("SELECT storage_path FROM memes WHERE storage_path IS NOT NULL").all();
-    const existingPaths = new Set(existingRows.map((r) => r.storage_path));
-    const { results: existingUrls } = await db.prepare("SELECT image_url FROM memes WHERE image_url IS NOT NULL").all();
-    const existingUrlSet = new Set(existingUrls.map((r) => r.image_url));
+    const { results: existingRows } = await db.prepare("SELECT storage_path, image_url FROM memes WHERE storage_path IS NOT NULL OR image_url IS NOT NULL").all();
+    const existingPaths = /* @__PURE__ */ new Set();
+    const existingUrlSet = /* @__PURE__ */ new Set();
+    for (const r of existingRows || []) {
+      if (r.storage_path) existingPaths.add(r.storage_path);
+      if (r.image_url) existingUrlSet.add(r.image_url);
+    }
     const missing = mediaObjects.filter((obj) => {
       const fullUrl = publicBase ? `${publicBase}/${obj.key}` : obj.key;
       return !existingPaths.has(obj.key) && !existingUrlSet.has(fullUrl);
     });
-    let synced = 0;
-    const syncedFiles = [];
-    const errors = [];
+    if (missing.length === 0) {
+      const duration2 = Date.now() - startTime;
+      return json({
+        message: "All R2 files are already synchronized with D1.",
+        totalR2Files: mediaObjects.length,
+        alreadyInD1: mediaObjects.length,
+        newlySynced: 0,
+        syncedFiles: [],
+        duration_ms: duration2
+      });
+    }
     const now = (/* @__PURE__ */ new Date()).toISOString();
+    const syncedFiles = [];
+    const statements = [];
     for (const obj of missing) {
-      try {
-        const ext = obj.key.slice(obj.key.lastIndexOf(".")).toLowerCase();
-        const isVideo = [".mp4", ".webm", ".mov", ".avi", ".mkv"].includes(ext);
-        const mediaType = isVideo ? "video" : "image";
-        const filename = obj.key.split("/").pop() || obj.key;
-        const cleanName = filename.replace(/^[a-f0-9-]{36,}-?/i, "").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || filename.replace(/\.[^.]+$/, "");
-        const title = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-        const fullUrl = publicBase ? `${publicBase}/${obj.key}` : "";
-        const id = crypto.randomUUID();
-        await db.prepare(
+      const ext = obj.key.slice(obj.key.lastIndexOf(".")).toLowerCase();
+      const isVideo = [".mp4", ".webm", ".mov", ".avi", ".mkv"].includes(ext);
+      const mediaType = isVideo ? "video" : "image";
+      const filename = obj.key.split("/").pop() || obj.key;
+      const cleanName = filename.replace(/^[a-f0-9-]{36,}-?/i, "").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || filename.replace(/\.[^.]+$/, "");
+      const title = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      const fullUrl = publicBase ? `${publicBase}/${obj.key}` : "";
+      const id = crypto.randomUUID();
+      statements.push(
+        db.prepare(
           `INSERT INTO memes (id, title, image_url, storage_path, source_link, category, tags, rarity, status, media_type, input_method, is_active, uploaded_at, share_text, shown_count, share_count, random_key)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           id,
           title,
@@ -1197,27 +1212,28 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
           "active",
           mediaType,
           "upload",
-          // use 'upload' — valid CHECK constraint value
           1,
           obj.uploaded || now,
           "Spawned from Meme Capsule",
           0,
           0,
           Math.random()
-        ).run();
-        synced++;
-        syncedFiles.push(obj.key);
-      } catch (insertError) {
-        errors.push(`${obj.key}: ${insertError instanceof Error ? insertError.message : String(insertError)}`);
-      }
+        )
+      );
+      syncedFiles.push(obj.key);
     }
+    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+      const chunk = statements.slice(i, i + BATCH_SIZE);
+      await db.batch(chunk);
+    }
+    const duration = Date.now() - startTime;
     return json({
-      message: `Synced ${synced} new files from R2 to D1.`,
+      message: `Synced ${syncedFiles.length} new files from R2 to D1 in ${duration}ms.`,
       totalR2Files: mediaObjects.length,
       alreadyInD1: mediaObjects.length - missing.length,
-      newlySynced: synced,
+      newlySynced: syncedFiles.length,
       syncedFiles,
-      ...errors.length > 0 ? { errors } : {}
+      duration_ms: duration
     });
   } catch (error) {
     return json(
@@ -1440,7 +1456,7 @@ var onRequestGet9 = /* @__PURE__ */ __name(async ({ env }) => {
   return json({ meme });
 }, "onRequestGet");
 
-// ../.wrangler/tmp/pages-rI7gtd/functionsRoutes-0.15369742901343575.mjs
+// ../.wrangler/tmp/pages-Knc9gL/functionsRoutes-0.24785392990913502.mjs
 var routes = [
   {
     routePath: "/api/admin/analytics/meme/:memeId",

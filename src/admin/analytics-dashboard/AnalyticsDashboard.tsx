@@ -12,11 +12,35 @@ export default function AnalyticsDashboard({ adminToken }: AnalyticsDashboardPro
   const [activeTab, setActiveTab] = useState<"overview" | "rankings" | "insights">("overview");
   const [selectedMemeId, setSelectedMemeId] = useState<string | null>(null);
 
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
   // Reset Modal state
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [resetError, setResetError] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+
+  const handleRecalculate = async () => {
+    if (isRecalculating) return;
+    setIsRecalculating(true);
+    try {
+      const res = await fetch('/api/admin/analytics/recalculate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Recalculated successfully. Processed ${data.processed} memes in ${data.duration_ms}ms.`);
+        window.location.reload();
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch(err: any) {
+      alert(err.message);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
 
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +101,7 @@ export default function AnalyticsDashboard({ adminToken }: AnalyticsDashboardPro
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button 
             className="brutalist-interactive brutalist-border-sm"
+            disabled={isRecalculating}
             style={{ 
               padding: '8px 16px', 
               display: 'flex', 
@@ -85,24 +110,20 @@ export default function AnalyticsDashboard({ adminToken }: AnalyticsDashboardPro
               background: 'var(--surface)', 
               color: 'var(--on-surface)',
               fontWeight: 700,
-              cursor: 'pointer' 
+              cursor: isRecalculating ? 'wait' : 'pointer',
+              opacity: isRecalculating ? 0.7 : 1
             }}
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/admin/analytics/recalculate', { method: 'POST', headers: { Authorization: `Bearer ${adminToken}` } });
-                const data = await res.json();
-                if (data.success) {
-                  alert(`Recalculated successfully. Processed ${data.processed} memes in ${data.duration_ms}ms.`);
-                  window.location.reload();
-                } else {
-                  alert(`Error: ${data.error}`);
-                }
-              } catch(err: any) {
-                alert(err.message);
-              }
-            }}
+            onClick={handleRecalculate}
           >
-            <span className="material-symbols-outlined">sync</span> Recalculate Now
+            <span
+              className="material-symbols-outlined"
+              style={{
+                animation: isRecalculating ? 'spin 1s linear infinite' : 'none'
+              }}
+            >
+              sync
+            </span>
+            {isRecalculating ? 'Recalculating...' : 'Recalculate Now'}
           </button>
 
           <button 

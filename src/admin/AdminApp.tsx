@@ -11,7 +11,7 @@ import {
   Trash2,
   UploadCloud
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useState, useEffect } from "react";
+import React, { ChangeEvent, FormEvent, useMemo, useState, useEffect, useCallback } from "react";
 import {
   archiveBackendMeme,
   listBackendMemes,
@@ -39,6 +39,7 @@ type FormState = Omit<AdminMeme, "tags"> & {
 };
 
 const ADMIN_TOKEN_KEY = "meme-capsule:admin-api-token";
+const PAGE_SIZE = 25;
 
 const toFormState = (meme: AdminMeme): FormState => ({
   ...meme,
@@ -52,6 +53,64 @@ const fromFormState = (form: FormState): AdminMeme =>
     media_type: form.media_type || detectMediaType(form.url)
   });
 
+interface MemeRowProps {
+  meme: AdminMeme;
+  backendMode: boolean;
+  onEdit: (meme: AdminMeme) => void;
+  onDelete: (id: string) => void;
+}
+
+const MemeRow = React.memo(function MemeRow({ meme, backendMode, onEdit, onDelete }: MemeRowProps) {
+  return (
+    <div className="collection-row brutalist-border brutalist-shadow-black brutalist-interactive" onClick={() => onEdit(meme)}>
+      <div className="thumb brutalist-border-sm">
+        {meme.media_type === "video" ? (
+          <video src={meme.url} muted preload="metadata" />
+        ) : (
+          <img src={meme.url} alt={meme.title || "Meme preview"} loading="lazy" />
+        )}
+        <div className="overlay"></div>
+        {!meme.url && <span className="material-symbols-outlined" style={{ zIndex: 2 }}>image</span>}
+      </div>
+      <div className="collection-meta">
+        <h4 style={{ textDecoration: meme.status === "archived" ? "line-through" : "none" }}>
+          {meme.title || "Untitled Meme"}
+        </h4>
+        <div className="badge-row">
+          <span className={`badge brutalist-border-sm ${meme.status}`}>{meme.status}</span>
+          <span className="likes-count">
+            <span className="material-symbols-outlined">favorite</span> {meme.likes_count ?? 0}
+          </span>
+        </div>
+        <p className="row-id">ID: {meme.id}</p>
+      </div>
+      <div className="row-actions">
+        <button
+          type="button"
+          className="brutalist-border-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(meme);
+          }}
+        >
+          <span className="material-symbols-outlined">edit</span> Edit
+        </button>
+        <button
+          type="button"
+          className="delete-btn brutalist-border-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(meme.id);
+          }}
+        >
+          <span className="material-symbols-outlined">{backendMode ? "archive" : "delete"}</span>
+          {backendMode ? "Archv" : "Del"}
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function AdminApp() {
   const [collection, setCollection] = useState<AdminMeme[]>(() => readAdminCollection());
   const [form, setForm] = useState<FormState>(() => toFormState(emptyAdminMeme()));
@@ -59,11 +118,17 @@ export default function AdminApp() {
   const [adminToken, setAdminToken] = useState(() => window.sessionStorage.getItem(ADMIN_TOKEN_KEY) || "");
   const [backendMode, setBackendMode] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncActionName, setSyncActionName] = useState("");
   const [notice, setNotice] = useState("Admin collection is local draft storage until the Cloudflare backend is connected.");
   const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
   const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<"vault" | "analytics" | "sql">("vault");
+
+  // Filtering & Pagination
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (adminToken.trim()) {
@@ -73,11 +138,46 @@ export default function AdminApp() {
   }, []);
 
   const stats = useMemo(() => {
-    const active = collection.filter((meme) => meme.status === "active").length;
-    const drafts = collection.filter((meme) => meme.status === "draft").length;
-    const archived = collection.filter((meme) => meme.status === "archived").length;
+    let active = 0;
+    let drafts = 0;
+    let archived = 0;
+    for (const m of collection) {
+      if (m.status === "active") active++;
+      else if (m.status === "draft") drafts++;
+      else if (m.status === "archived") archived++;
+    }
     return { active, drafts, archived, total: collection.length };
   }, [collection]);
+
+  // Filtered and paginated list for instantaneous UI responsiveness
+  const filteredCollection = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return collection.filter((meme) => {
+      if (statusFilter !== "all" && meme.status !== statusFilter) {
+        return false;
+      }
+      if (!term) return true;
+      return (
+        (meme.title && meme.title.toLowerCase().includes(term)) ||
+        (meme.id && meme.id.toLowerCase().includes(term)) ||
+        (meme.category && meme.category.toLowerCase().includes(term)) ||
+        (meme.tags && meme.tags.some((t) => t.toLowerCase().includes(term)))
+      );
+    });
+  }, [collection, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCollection.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedMemes = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredCollection.slice(start, start + PAGE_SIZE);
+  }, [filteredCollection, currentPage]);
 
   const updateCollection = (nextCollection: AdminMeme[], message: string) => {
     setCollection(nextCollection);
@@ -110,12 +210,11 @@ export default function AdminApp() {
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (backendMode && adminToken) {
       setIsSyncing(true);
+      setSyncActionName("Uploading file...");
       try {
         const uploaded = await uploadBackendMemeFile(adminToken, file);
         setForm((current) => ({
@@ -132,6 +231,7 @@ export default function AdminApp() {
         setNotice(error instanceof Error ? error.message : "Backend upload failed.");
       } finally {
         setIsSyncing(false);
+        setSyncActionName("");
       }
       return;
     }
@@ -148,7 +248,7 @@ export default function AdminApp() {
         input_method: "upload",
         media_type: file.type.startsWith("video/") ? "video" : "image"
       }));
-      setNotice("File loaded as a local draft preview. Use Supabase/Cloudinary for production storage.");
+      setNotice("File loaded as a local draft preview.");
     };
     reader.readAsDataURL(file);
   };
@@ -165,6 +265,7 @@ export default function AdminApp() {
     }
 
     setIsSyncing(true);
+    setSyncActionName("Connecting backend...");
     try {
       window.sessionStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
       const response = await fetch("/api/admin/memes", {
@@ -192,6 +293,7 @@ export default function AdminApp() {
       setNotice(error instanceof Error ? error.message : "Unable to load backend collection.");
     } finally {
       setIsSyncing(false);
+      setSyncActionName("");
     }
   };
 
@@ -202,19 +304,17 @@ export default function AdminApp() {
   };
 
   const handleSyncR2 = async () => {
-    if (!adminToken.trim()) {
-      setNotice("Enter your admin API token before syncing.");
-      return;
-    }
+    if (!adminToken.trim() || isSyncing) return;
 
     setIsSyncing(true);
+    setSyncActionName("Syncing R2 bucket...");
     try {
       const result = await syncR2ToD1(adminToken);
       setNotice(
-        `✅ ${result.message} (${result.totalR2Files} total in R2, ${result.alreadyInD1} already tracked)`
+        `✅ ${result.message} (${result.totalR2Files} total in R2, ${result.alreadyInD1} already in D1)`
       );
 
-      // Auto-reload the collection to show newly synced memes
+      // Reload memes if new files were synced
       if (result.newlySynced > 0) {
         const memes = await listBackendMemes(adminToken);
         setCollection(memes.map(normalizeAdminMeme));
@@ -225,6 +325,7 @@ export default function AdminApp() {
       setNotice(error instanceof Error ? error.message : "R2 sync failed.");
     } finally {
       setIsSyncing(false);
+      setSyncActionName("");
     }
   };
 
@@ -252,6 +353,7 @@ export default function AdminApp() {
       }
 
       setIsSyncing(true);
+      setSyncActionName("Saving meme...");
       try {
         const savedMeme = normalizeAdminMeme(
           await saveBackendMeme(adminToken, meme, editingOriginalId)
@@ -270,6 +372,7 @@ export default function AdminApp() {
         setNotice(error instanceof Error ? error.message : "Backend save failed.");
       } finally {
         setIsSyncing(false);
+        setSyncActionName("");
       }
       return;
     }
@@ -285,13 +388,13 @@ export default function AdminApp() {
     resetForm();
   };
 
-  const editMeme = (meme: AdminMeme) => {
+  const editMeme = useCallback((meme: AdminMeme) => {
     setEditingOriginalId(meme.id);
     setForm(toFormState(meme));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, []);
 
-  const deleteMeme = async (id: string) => {
+  const deleteMeme = useCallback(async (id: string) => {
     if (backendMode) {
       if (!adminToken.trim()) {
         setNotice("Backend mode needs an admin API token.");
@@ -299,6 +402,7 @@ export default function AdminApp() {
       }
 
       setIsSyncing(true);
+      setSyncActionName("Archiving meme...");
       try {
         const archived = normalizeAdminMeme(await archiveBackendMeme(adminToken, id));
         setCollection((current) => current.map((meme) => (meme.id === id ? archived : meme)));
@@ -307,6 +411,7 @@ export default function AdminApp() {
         setNotice(error instanceof Error ? error.message : "Backend archive failed.");
       } finally {
         setIsSyncing(false);
+        setSyncActionName("");
       }
       if (editingOriginalId === id) {
         resetForm();
@@ -321,7 +426,7 @@ export default function AdminApp() {
     if (editingOriginalId === id) {
       resetForm();
     }
-  };
+  }, [backendMode, adminToken, editingOriginalId, collection]);
 
   const exportCollection = () => {
     const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/json" });
@@ -345,7 +450,7 @@ export default function AdminApp() {
         <div className="header-actions">
           <div className="backend-pill">
             <span>{backendMode ? "BACKEND MODE" : "LOCAL MODE"}</span>
-            <div className={`status-dot ${backendMode ? 'active' : ''}`}></div>
+            <div className={`status-dot ${backendMode ? "active" : ""}`}></div>
           </div>
           <div className="token-input">
             <span className="material-symbols-outlined">key</span>
@@ -356,8 +461,27 @@ export default function AdminApp() {
               onChange={(e) => setAdminToken(e.target.value)}
             />
           </div>
-          <button onClick={adminToken ? loadBackend : saveToken} className="icon-btn brutalist-interactive" title="Sync / Load Backend" style={{ background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>
-            <span className="material-symbols-outlined">sync</span>
+          <button
+            onClick={adminToken ? loadBackend : saveToken}
+            className="icon-btn brutalist-interactive"
+            title="Sync / Load Backend"
+            disabled={isSyncing}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--primary)",
+              cursor: isSyncing ? "wait" : "pointer"
+            }}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{
+                animation: isSyncing ? "spin 1s linear infinite" : "none",
+                display: "inline-block"
+              }}
+            >
+              sync
+            </span>
           </button>
         </div>
       </header>
@@ -366,15 +490,15 @@ export default function AdminApp() {
         <nav className="nav-drawer">
           <h2>ADMIN CONSOLE</h2>
           <ul>
-            <li className={activeTab === 'vault' ? "active" : ""} onClick={() => setActiveTab('vault')}>
+            <li className={activeTab === "vault" ? "active" : ""} onClick={() => setActiveTab("vault")}>
               <span className="material-symbols-outlined">dashboard</span>
               Meme Vault
             </li>
-            <li className={activeTab === 'analytics' ? "active" : ""} onClick={() => setActiveTab('analytics')}>
+            <li className={activeTab === "analytics" ? "active" : ""} onClick={() => setActiveTab("analytics")}>
               <span className="material-symbols-outlined">query_stats</span>
               Analytics
             </li>
-            <li className={activeTab === 'sql' ? "active" : ""} onClick={() => setActiveTab('sql')}>
+            <li className={activeTab === "sql" ? "active" : ""} onClick={() => setActiveTab("sql")}>
               <span className="material-symbols-outlined">terminal</span>
               SQL Playground
             </li>
@@ -382,14 +506,27 @@ export default function AdminApp() {
               <span className="material-symbols-outlined">inventory_2</span>
               Use Local Drafts
             </li>
-            <li onClick={backendMode ? handleSyncR2 : undefined} style={{ opacity: backendMode ? 1 : 0.5 }}>
-              <span className="material-symbols-outlined">refresh</span>
-              Sync R2 Files
+            <li
+              onClick={backendMode && !isSyncing ? handleSyncR2 : undefined}
+              style={{
+                opacity: backendMode ? 1 : 0.5,
+                cursor: backendMode && !isSyncing ? "pointer" : "not-allowed"
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  animation: isSyncing && syncActionName.includes("R2") ? "spin 1s linear infinite" : "none"
+                }}
+              >
+                refresh
+              </span>
+              {isSyncing && syncActionName.includes("R2") ? "Syncing R2..." : "Sync R2 Files"}
             </li>
           </ul>
           <div className="sys-status">
             <p>SYSTEM UPTIME: 99.9%</p>
-            <p>VERSION: 2.4.1-BETA</p>
+            <p>VERSION: 2.4.2-FAST</p>
           </div>
         </nav>
 
@@ -414,72 +551,176 @@ export default function AdminApp() {
           </section>
 
           {notice && (
-            <div className="brutalist-border-sm" style={{ padding: '12px', background: 'var(--surface-container-highest)', color: 'var(--primary)', fontFamily: 'monospace' }}>
-              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>info</span>
-              {notice}
+            <div
+              className="brutalist-border-sm"
+              style={{
+                padding: "12px",
+                background: "var(--surface-container-highest)",
+                color: "var(--primary)",
+                fontFamily: "monospace",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <span className="material-symbols-outlined">info</span>
+              <span>{notice}</span>
+              {isSyncing && (
+                <span style={{ marginLeft: "auto", color: "var(--secondary)", fontWeight: 700 }}>
+                  ⏳ {syncActionName || "Processing..."}
+                </span>
+              )}
             </div>
           )}
 
-          {activeTab === 'analytics' ? (
-            <div style={{ background: 'var(--background)', flex: 1, minHeight: '600px' }} className="brutalist-border brutalist-shadow-black">
+          {activeTab === "analytics" ? (
+            <div
+              style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}
+              className="brutalist-border brutalist-shadow-black"
+            >
               <AnalyticsDashboard adminToken={adminToken} />
             </div>
-          ) : activeTab === 'sql' ? (
-            <div style={{ background: 'var(--background)', flex: 1, minHeight: '600px' }} className="brutalist-border brutalist-shadow-black">
+          ) : activeTab === "sql" ? (
+            <div
+              style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}
+              className="brutalist-border brutalist-shadow-black"
+            >
               <SqlRunner adminToken={adminToken} />
             </div>
           ) : (
             <div className="split-pane">
               {/* LEFT PANE - VAULT */}
               <section className="left-pane">
-                <div className="pane-header">
-                  <h3>Meme Vault</h3>
-                  <div className="filter-actions">
-                    <button className="filter-btn brutalist-border-sm brutalist-interactive">
-                      <span className="material-symbols-outlined">filter_list</span>
-                    </button>
-                    <button className="filter-btn brutalist-border-sm brutalist-interactive">
-                      <span className="material-symbols-outlined">sort</span>
-                    </button>
+                <div className="pane-header" style={{ flexDirection: "column", gap: "12px", alignItems: "stretch" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h3>Meme Vault ({filteredCollection.length})</h3>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      {(["all", "active", "draft", "archived"] as const).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => {
+                            setStatusFilter(st);
+                            setCurrentPage(1);
+                          }}
+                          className="brutalist-border-sm"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            background: statusFilter === st ? "var(--primary)" : "var(--surface)",
+                            color: statusFilter === st ? "var(--on-primary)" : "var(--on-surface)",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {st}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Search filter input */}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ flex: 1, position: "relative" }}>
+                      <input
+                        type="text"
+                        placeholder="Quick search by title, ID, tag, category..."
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="brutalist-input"
+                        style={{ width: "100%", padding: "8px 12px", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm("")}
+                        className="brutalist-border-sm"
+                        style={{
+                          padding: "0 12px",
+                          background: "var(--surface-container-high)",
+                          color: "var(--on-surface)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* Paginated Collection List */}
                 <div className="collection-list custom-scrollbar">
-                  {collection.length === 0 && (
-                    <div style={{ color: 'var(--outline-variant)', padding: '16px' }}>No admin memes yet.</div>
-                  )}
-                  {collection.map((meme) => (
-                    <div key={meme.id} className="collection-row brutalist-border brutalist-shadow-black brutalist-interactive" onClick={() => editMeme(meme)}>
-                      <div className="thumb brutalist-border-sm">
-                        {meme.media_type === 'video' ? (
-                          <video src={meme.url} muted />
-                        ) : (
-                          <img src={meme.url} alt={meme.title} />
-                        )}
-                        <div className="overlay"></div>
-                        {!meme.url && <span className="material-symbols-outlined" style={{ zIndex: 2 }}>image</span>}
-                      </div>
-                      <div className="collection-meta">
-                        <h4 style={{ textDecoration: meme.status === 'archived' ? 'line-through' : 'none' }}>{meme.title || "Untitled Meme"}</h4>
-                        <div className="badge-row">
-                          <span className={`badge brutalist-border-sm ${meme.status}`}>{meme.status}</span>
-                          <span className="likes-count">
-                            <span className="material-symbols-outlined">favorite</span> {meme.likes_count ?? 0}
-                          </span>
-                        </div>
-                        <p className="row-id">ID: {meme.id}</p>
-                      </div>
-                      <div className="row-actions">
-                        <button type="button" className="brutalist-border-sm" onClick={(e) => { e.stopPropagation(); editMeme(meme); }}>
-                          <span className="material-symbols-outlined">edit</span> Edit
-                        </button>
-                        <button type="button" className="delete-btn brutalist-border-sm" onClick={(e) => { e.stopPropagation(); deleteMeme(meme.id); }}>
-                          <span className="material-symbols-outlined">{backendMode ? "restore" : "delete"}</span> 
-                          {backendMode ? "Archv" : "Del"}
-                        </button>
-                      </div>
+                  {filteredCollection.length === 0 ? (
+                    <div style={{ color: "var(--outline-variant)", padding: "24px", textAlign: "center" }}>
+                      {searchTerm ? "No memes match your search query." : "No admin memes in this view."}
                     </div>
-                  ))}
+                  ) : (
+                    paginatedMemes.map((meme) => (
+                      <MemeRow
+                        key={meme.id}
+                        meme={meme}
+                        backendMode={backendMode}
+                        onEdit={editMeme}
+                        onDelete={deleteMeme}
+                      />
+                    ))
+                  )}
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      background: "var(--surface-container)",
+                      border: "2px solid black"
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="brutalist-border-sm brutalist-interactive"
+                      style={{
+                        padding: "6px 16px",
+                        background: currentPage === 1 ? "var(--surface-container-lowest)" : "var(--surface)",
+                        color: "var(--on-surface)",
+                        fontWeight: 700,
+                        cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                        opacity: currentPage === 1 ? 0.5 : 1
+                      }}
+                    >
+                      ◀ Prev
+                    </button>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--secondary)" }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="brutalist-border-sm brutalist-interactive"
+                      style={{
+                        padding: "6px 16px",
+                        background: currentPage === totalPages ? "var(--surface-container-lowest)" : "var(--surface)",
+                        color: "var(--on-surface)",
+                        fontWeight: 700,
+                        cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                        opacity: currentPage === totalPages ? 0.5 : 1
+                      }}
+                    >
+                      Next ▶
+                    </button>
+                  </div>
+                )}
               </section>
 
               {/* RIGHT PANE - EDITOR */}
@@ -493,26 +734,26 @@ export default function AdminApp() {
                     <div className="media-zone">
                       <label className="file-dropzone">
                         <span className="material-symbols-outlined">upload_file</span>
-                        <span>DROP FILE HERE</span>
-                        <input accept="image/*,video/*" type="file" onChange={handleFileUpload} />
+                        <span>{isSyncing && syncActionName.includes("Upload") ? "UPLOADING..." : "DROP FILE HERE"}</span>
+                        <input accept="image/*,video/*" type="file" onChange={handleFileUpload} disabled={isSyncing} />
                       </label>
                       <div className="url-zone">
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Media URL</label>
+                          <label style={{ color: "var(--outline)", fontSize: "10px" }}>Media URL</label>
                           <input 
                             className="brutalist-input" 
-                            style={{ fontFamily: 'monospace' }} 
+                            style={{ fontFamily: "monospace" }} 
                             value={form.url} 
                             onChange={(e) => handleUrlInput(e.target.value.includes("drive.google") ? "google-drive" : "url", e.target.value)} 
                             placeholder="https://..." 
                           />
                         </div>
                         {form.url && (
-                          <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center' }}>
+                          <div style={{ marginTop: "auto", display: "flex", justifyContent: "center" }}>
                             {form.media_type === "video" ? (
-                              <video controls src={form.url} style={{ maxHeight: '100px', border: '2px solid var(--outline-variant)' }} />
+                              <video controls src={form.url} style={{ maxHeight: "100px", border: "2px solid var(--outline-variant)" }} />
                             ) : (
-                              <img src={form.url} alt="Preview" style={{ maxHeight: '100px', border: '2px solid var(--outline-variant)' }} />
+                              <img src={form.url} alt="Preview" style={{ maxHeight: "100px", border: "2px solid var(--outline-variant)" }} />
                             )}
                           </div>
                         )}
@@ -525,7 +766,7 @@ export default function AdminApp() {
                       <label>Title</label>
                       <input 
                         className="brutalist-input" 
-                        style={{ fontFamily: 'var(--font-display)', fontSize: '20px', textTransform: 'uppercase' }} 
+                        style={{ fontFamily: "var(--font-display)", fontSize: "20px", textTransform: "uppercase" }} 
                         value={form.title} 
                         onChange={(e) => updateForm("title", e.target.value)} 
                         placeholder="Exam week survival"
@@ -535,7 +776,7 @@ export default function AdminApp() {
                       <label>Category</label>
                       <input 
                         className="brutalist-input" 
-                        style={{ textTransform: 'uppercase', fontWeight: 700 }}
+                        style={{ textTransform: "uppercase", fontWeight: 700 }}
                         value={form.category} 
                         onChange={(e) => updateForm("category", e.target.value)} 
                       />
@@ -544,7 +785,7 @@ export default function AdminApp() {
                       <label>Status</label>
                       <select 
                         className="brutalist-input" 
-                        style={{ textTransform: 'uppercase', fontWeight: 700, color: 'var(--secondary)' }}
+                        style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--secondary)" }}
                         value={form.status} 
                         onChange={(e) => updateForm("status", e.target.value as MemeStatus)}
                       >
@@ -557,7 +798,7 @@ export default function AdminApp() {
                       <label>Rarity</label>
                       <select 
                         className="brutalist-input" 
-                        style={{ textTransform: 'uppercase', fontWeight: 700, color: 'var(--tertiary-container)' }}
+                        style={{ textTransform: "uppercase", fontWeight: 700, color: "var(--tertiary-container)" }}
                         value={form.rarity} 
                         onChange={(e) => updateForm("rarity", e.target.value as Rarity)}
                       >
@@ -572,7 +813,7 @@ export default function AdminApp() {
                       <input 
                         type="number"
                         className="brutalist-input" 
-                        style={{ fontFamily: 'monospace' }}
+                        style={{ fontFamily: "monospace" }}
                         value={form.likes_count ?? 0} 
                         onChange={(e) => updateForm("likes_count", Number(e.target.value))} 
                       />
@@ -585,32 +826,32 @@ export default function AdminApp() {
                         e.preventDefault();
                         setShowAdvanced(!showAdvanced);
                       }}>
-                        <span className="material-symbols-outlined" style={{ transform: showAdvanced ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>chevron_right</span>
+                        <span className="material-symbols-outlined" style={{ transform: showAdvanced ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>chevron_right</span>
                         Advanced Options
                       </summary>
                       {showAdvanced && (
                         <div className="advanced-content brutalist-border-sm">
                           <div className="form-group">
-                            <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Meme ID</label>
+                            <label style={{ color: "var(--outline)", fontSize: "10px" }}>Meme ID</label>
                             <input className="brutalist-input" value={form.id} onChange={(e) => updateForm("id", e.target.value)} />
                           </div>
                           <div className="form-group">
-                            <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Tags (Comma separated)</label>
+                            <label style={{ color: "var(--outline)", fontSize: "10px" }}>Tags (Comma separated)</label>
                             <input className="brutalist-input" value={form.tags} onChange={(e) => updateForm("tags", e.target.value)} />
                           </div>
                           <div className="form-group">
-                            <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Storage Path</label>
+                            <label style={{ color: "var(--outline)", fontSize: "10px" }}>Storage Path</label>
                             <input className="brutalist-input" value={form.storage_path || ""} onChange={(e) => updateForm("storage_path", e.target.value)} />
                           </div>
                           <div className="form-group">
-                            <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Share Text</label>
+                            <label style={{ color: "var(--outline)", fontSize: "10px" }}>Share Text</label>
                             <input className="brutalist-input" value={form.share_text} onChange={(e) => updateForm("share_text", e.target.value)} />
                           </div>
                           <div className="form-group">
-                            <label style={{ color: 'var(--outline)', fontSize: '10px' }}>Rights Note</label>
+                            <label style={{ color: "var(--outline)", fontSize: "10px" }}>Rights Note</label>
                             <input className="brutalist-input" value={form.rights_note} onChange={(e) => updateForm("rights_note", e.target.value)} />
                           </div>
-                          <button type="button" onClick={exportCollection} className="btn-clear brutalist-border-sm" style={{ padding: '8px', color: 'var(--primary)', borderColor: 'var(--primary)', marginTop: '8px', width: 'fit-content' }}>
+                          <button type="button" onClick={exportCollection} className="btn-clear brutalist-border-sm" style={{ padding: "8px", color: "var(--primary)", borderColor: "var(--primary)", marginTop: "8px", width: "fit-content" }}>
                             Export JSON
                           </button>
                         </div>
@@ -619,10 +860,22 @@ export default function AdminApp() {
                   </div>
 
                   <div className="form-actions">
-                    <button type="submit" className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive">
-                      {editingOriginalId ? "Save Changes" : "Save Meme"}
+                    <button
+                      type="submit"
+                      disabled={isSyncing}
+                      className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive"
+                      style={{
+                        opacity: isSyncing ? 0.7 : 1,
+                        cursor: isSyncing ? "wait" : "pointer"
+                      }}
+                    >
+                      {isSyncing && syncActionName.includes("Saving")
+                        ? "Saving..."
+                        : editingOriginalId
+                        ? "Save Changes"
+                        : "Save Meme"}
                     </button>
-                    <button type="button" className="btn-clear brutalist-border-sm" onClick={resetForm}>
+                    <button type="button" className="btn-clear brutalist-border-sm" onClick={resetForm} disabled={isSyncing}>
                       Clear
                     </button>
                   </div>
