@@ -5,10 +5,11 @@ const BATCH_SIZE = 50;
 
 /**
  * POST /api/admin/sync-r2
- * Scans the R2 bucket and creates D1 records for any files
- * that don't already have a matching storage_path in the database.
  * 
- * Optimized with D1 batch transactions for ultra-fast, non-blocking execution.
+ * True Bidirectional Sync between Cloudflare R2 and D1 database:
+ * 1. Additions: Creates D1 records for any new files present in R2 but missing in D1.
+ * 2. Deletions: Cleans up D1 records (and analytics references) for any R2-backed files that have been removed from the R2 bucket.
+ * 3. Preserves: External URL memes (e.g. imgur, external CDNs) are preserved and never deleted.
  */
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const adminError = requireAdmin(request, env);
@@ -21,7 +22,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const db = env.DB;
     const publicBase = (env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-    // 1. List all objects in R2 (fast pagination)
+    // 1. List all objects in R2 bucket (with pagination handling)
     const allObjects: { key: string; uploaded?: string }[] = [];
     let cursor: string | undefined;
     let listAttempts = 0;
@@ -39,10 +40,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }
       cursor = listed.truncated ? listed.cursor : undefined;
       listAttempts++;
-      if (listAttempts > 20) break; // safety limit: 20,000 files max
+      if (listAttempts > 50) break; // safety limit: 50,000 files max
     } while (cursor);
 
-    // 2. Filter only image/video files by extension
+    // 2. Filter only valid image/video media files by extension
     const mediaExtensions = new Set([
       ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".bmp",
       ".mp4", ".webm", ".mov", ".avi", ".mkv"
@@ -55,48 +56,80 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return mediaExtensions.has(ext);
     });
 
-    // 3. Single fast query to get all existing storage_paths & image_urls from D1
-    const { results: existingRows } = await db
-      .prepare("SELECT storage_path, image_url FROM memes WHERE storage_path IS NOT NULL OR image_url IS NOT NULL")
-      .all<{ storage_path: string | null; image_url: string | null }>();
+    const r2KeySet = new Set<string>();
+    const r2UrlSet = new Set<string>();
 
-    const existingPaths = new Set<string>();
-    const existingUrlSet = new Set<string>();
-
-    for (const r of existingRows || []) {
-      if (r.storage_path) existingPaths.add(r.storage_path);
-      if (r.image_url) existingUrlSet.add(r.image_url);
+    for (const obj of mediaObjects) {
+      r2KeySet.add(obj.key);
+      if (publicBase) {
+        r2UrlSet.add(`${publicBase}/${obj.key}`);
+      }
     }
 
-    // 4. Find files in R2 that are NOT in D1
-    const missing = mediaObjects.filter((obj) => {
+    // 3. Query all existing memes from D1 database
+    const { results: existingMemes } = await db
+      .prepare("SELECT id, title, storage_path, image_url, input_method FROM memes")
+      .all<{
+        id: string;
+        title: string | null;
+        storage_path: string | null;
+        image_url: string | null;
+        input_method: string | null;
+      }>();
+
+    const d1Rows = existingMemes || [];
+    const d1StoragePathsSet = new Set<string>();
+    const d1UrlSet = new Set<string>();
+
+    for (const r of d1Rows) {
+      if (r.storage_path) d1StoragePathsSet.add(r.storage_path);
+      if (r.image_url) d1UrlSet.add(r.image_url);
+    }
+
+    // 4. Determine ADDITIONS: Files in R2 that do NOT exist in D1
+    const missingInD1 = mediaObjects.filter((obj) => {
       const fullUrl = publicBase ? `${publicBase}/${obj.key}` : obj.key;
-      return !existingPaths.has(obj.key) && !existingUrlSet.has(fullUrl);
+      return !d1StoragePathsSet.has(obj.key) && !d1UrlSet.has(fullUrl);
     });
 
-    if (missing.length === 0) {
-      const duration = Date.now() - startTime;
-      return json({
-        message: "All R2 files are already synchronized with D1.",
-        totalR2Files: mediaObjects.length,
-        alreadyInD1: mediaObjects.length,
-        newlySynced: 0,
-        syncedFiles: [],
-        duration_ms: duration
-      });
+    // 5. Determine DELETIONS: R2-backed records in D1 whose files no longer exist in R2
+    const memesToDelete: { id: string; key: string }[] = [];
+
+    for (const r of d1Rows) {
+      let isR2Backed = false;
+      let r2Key: string | null = null;
+
+      if (r.storage_path && r.storage_path.trim() !== "") {
+        isR2Backed = true;
+        r2Key = r.storage_path.trim();
+      } else if (publicBase && r.image_url && r.image_url.startsWith(publicBase)) {
+        isR2Backed = true;
+        r2Key = r.image_url.replace(`${publicBase}/`, "").replace(/^\/+/, "");
+      } else if (r.input_method === "upload") {
+        isR2Backed = true;
+        r2Key = r.storage_path || (r.image_url ? r.image_url.split("/").pop() || null : null);
+      }
+
+      if (isR2Backed && r2Key) {
+        // If it's an R2 file but is no longer present in the bucket
+        if (!r2KeySet.has(r2Key)) {
+          memesToDelete.push({ id: r.id, key: r2Key });
+        }
+      }
     }
 
-    // 5. Build statements and insert missing files in D1 in fast parallel batches
+    // 6. Build and execute all batch statements (Insertions + Deletions)
+    const statements = [];
     const now = new Date().toISOString();
     const syncedFiles: string[] = [];
-    const statements = [];
+    const removedFiles: string[] = [];
 
-    for (const obj of missing) {
+    // Add statements for new files
+    for (const obj of missingInD1) {
       const ext = obj.key.slice(obj.key.lastIndexOf(".")).toLowerCase();
       const isVideo = [".mp4", ".webm", ".mov", ".avi", ".mkv"].includes(ext);
       const mediaType = isVideo ? "video" : "image";
 
-      // Derive a clean, human-readable title from the filename
       const filename = obj.key.split("/").pop() || obj.key;
       const cleanName = filename
         .replace(/^[a-f0-9-]{36,}-?/i, "")
@@ -136,6 +169,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       syncedFiles.push(obj.key);
     }
 
+    // Add statements for deleted files (clean up analytics references + meme row)
+    for (const item of memesToDelete) {
+      statements.push(db.prepare("DELETE FROM meme_events WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM meme_analytics WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM meme_daily_stats WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM memes WHERE id = ?").bind(item.id));
+      removedFiles.push(item.key);
+    }
+
     // Execute in fast chunks of 50
     for (let i = 0; i < statements.length; i += BATCH_SIZE) {
       const chunk = statements.slice(i, i + BATCH_SIZE);
@@ -143,19 +185,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     const duration = Date.now() - startTime;
+    const addedCount = syncedFiles.length;
+    const removedCount = memesToDelete.length;
+
+    let message = "All R2 files and D1 records are in sync.";
+    if (addedCount > 0 && removedCount > 0) {
+      message = `Two-way sync complete: Added ${addedCount} new files, removed ${removedCount} deleted files.`;
+    } else if (addedCount > 0) {
+      message = `Sync complete: Added ${addedCount} new files from R2.`;
+    } else if (removedCount > 0) {
+      message = `Sync complete: Removed ${removedCount} deleted files from D1.`;
+    }
 
     return json({
-      message: `Synced ${syncedFiles.length} new files from R2 to D1 in ${duration}ms.`,
+      message,
       totalR2Files: mediaObjects.length,
-      alreadyInD1: mediaObjects.length - missing.length,
-      newlySynced: syncedFiles.length,
+      alreadyInD1: mediaObjects.length - missingInD1.length,
+      newlySynced: addedCount,
+      removedCount,
       syncedFiles,
+      removedFiles,
       duration_ms: duration
     });
   } catch (error) {
     return json(
       {
-        error: "R2 sync failed",
+        error: "Two-way R2 sync failed",
         detail: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }

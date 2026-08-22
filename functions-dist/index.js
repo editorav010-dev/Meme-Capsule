@@ -1139,7 +1139,7 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
       }
       cursor = listed.truncated ? listed.cursor : void 0;
       listAttempts++;
-      if (listAttempts > 20) break;
+      if (listAttempts > 50) break;
     } while (cursor);
     const mediaExtensions = /* @__PURE__ */ new Set([
       ".jpg",
@@ -1162,32 +1162,51 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
       const ext = obj.key.slice(dotIndex).toLowerCase();
       return mediaExtensions.has(ext);
     });
-    const { results: existingRows } = await db.prepare("SELECT storage_path, image_url FROM memes WHERE storage_path IS NOT NULL OR image_url IS NOT NULL").all();
-    const existingPaths = /* @__PURE__ */ new Set();
-    const existingUrlSet = /* @__PURE__ */ new Set();
-    for (const r of existingRows || []) {
-      if (r.storage_path) existingPaths.add(r.storage_path);
-      if (r.image_url) existingUrlSet.add(r.image_url);
+    const r2KeySet = /* @__PURE__ */ new Set();
+    const r2UrlSet = /* @__PURE__ */ new Set();
+    for (const obj of mediaObjects) {
+      r2KeySet.add(obj.key);
+      if (publicBase) {
+        r2UrlSet.add(`${publicBase}/${obj.key}`);
+      }
     }
-    const missing = mediaObjects.filter((obj) => {
+    const { results: existingMemes } = await db.prepare("SELECT id, title, storage_path, image_url, input_method FROM memes").all();
+    const d1Rows = existingMemes || [];
+    const d1StoragePathsSet = /* @__PURE__ */ new Set();
+    const d1UrlSet = /* @__PURE__ */ new Set();
+    for (const r of d1Rows) {
+      if (r.storage_path) d1StoragePathsSet.add(r.storage_path);
+      if (r.image_url) d1UrlSet.add(r.image_url);
+    }
+    const missingInD1 = mediaObjects.filter((obj) => {
       const fullUrl = publicBase ? `${publicBase}/${obj.key}` : obj.key;
-      return !existingPaths.has(obj.key) && !existingUrlSet.has(fullUrl);
+      return !d1StoragePathsSet.has(obj.key) && !d1UrlSet.has(fullUrl);
     });
-    if (missing.length === 0) {
-      const duration2 = Date.now() - startTime;
-      return json({
-        message: "All R2 files are already synchronized with D1.",
-        totalR2Files: mediaObjects.length,
-        alreadyInD1: mediaObjects.length,
-        newlySynced: 0,
-        syncedFiles: [],
-        duration_ms: duration2
-      });
+    const memesToDelete = [];
+    for (const r of d1Rows) {
+      let isR2Backed = false;
+      let r2Key = null;
+      if (r.storage_path && r.storage_path.trim() !== "") {
+        isR2Backed = true;
+        r2Key = r.storage_path.trim();
+      } else if (publicBase && r.image_url && r.image_url.startsWith(publicBase)) {
+        isR2Backed = true;
+        r2Key = r.image_url.replace(`${publicBase}/`, "").replace(/^\/+/, "");
+      } else if (r.input_method === "upload") {
+        isR2Backed = true;
+        r2Key = r.storage_path || (r.image_url ? r.image_url.split("/").pop() || null : null);
+      }
+      if (isR2Backed && r2Key) {
+        if (!r2KeySet.has(r2Key)) {
+          memesToDelete.push({ id: r.id, key: r2Key });
+        }
+      }
     }
+    const statements = [];
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const syncedFiles = [];
-    const statements = [];
-    for (const obj of missing) {
+    const removedFiles = [];
+    for (const obj of missingInD1) {
       const ext = obj.key.slice(obj.key.lastIndexOf(".")).toLowerCase();
       const isVideo = [".mp4", ".webm", ".mov", ".avi", ".mkv"].includes(ext);
       const mediaType = isVideo ? "video" : "image";
@@ -1222,23 +1241,42 @@ var onRequestPost5 = /* @__PURE__ */ __name(async ({ request, env }) => {
       );
       syncedFiles.push(obj.key);
     }
+    for (const item of memesToDelete) {
+      statements.push(db.prepare("DELETE FROM meme_events WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM meme_analytics WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM meme_daily_stats WHERE meme_id = ?").bind(item.id));
+      statements.push(db.prepare("DELETE FROM memes WHERE id = ?").bind(item.id));
+      removedFiles.push(item.key);
+    }
     for (let i = 0; i < statements.length; i += BATCH_SIZE) {
       const chunk = statements.slice(i, i + BATCH_SIZE);
       await db.batch(chunk);
     }
     const duration = Date.now() - startTime;
+    const addedCount = syncedFiles.length;
+    const removedCount = memesToDelete.length;
+    let message = "All R2 files and D1 records are in sync.";
+    if (addedCount > 0 && removedCount > 0) {
+      message = `Two-way sync complete: Added ${addedCount} new files, removed ${removedCount} deleted files.`;
+    } else if (addedCount > 0) {
+      message = `Sync complete: Added ${addedCount} new files from R2.`;
+    } else if (removedCount > 0) {
+      message = `Sync complete: Removed ${removedCount} deleted files from D1.`;
+    }
     return json({
-      message: `Synced ${syncedFiles.length} new files from R2 to D1 in ${duration}ms.`,
+      message,
       totalR2Files: mediaObjects.length,
-      alreadyInD1: mediaObjects.length - missing.length,
-      newlySynced: syncedFiles.length,
+      alreadyInD1: mediaObjects.length - missingInD1.length,
+      newlySynced: addedCount,
+      removedCount,
       syncedFiles,
+      removedFiles,
       duration_ms: duration
     });
   } catch (error) {
     return json(
       {
-        error: "R2 sync failed",
+        error: "Two-way R2 sync failed",
         detail: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
@@ -1456,7 +1494,7 @@ var onRequestGet9 = /* @__PURE__ */ __name(async ({ env }) => {
   return json({ meme });
 }, "onRequestGet");
 
-// ../.wrangler/tmp/pages-Knc9gL/functionsRoutes-0.24785392990913502.mjs
+// ../.wrangler/tmp/pages-5RCBeZ/functionsRoutes-0.12977120444144052.mjs
 var routes = [
   {
     routePath: "/api/admin/analytics/meme/:memeId",

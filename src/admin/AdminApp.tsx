@@ -314,8 +314,8 @@ export default function AdminApp() {
         `✅ ${result.message} (${result.totalR2Files} total in R2, ${result.alreadyInD1} already in D1)`
       );
 
-      // Reload memes if new files were synced
-      if (result.newlySynced > 0) {
+      // Reload memes if new files were synced OR files were removed
+      if (result.newlySynced > 0 || (result.removedCount && result.removedCount > 0)) {
         const memes = await listBackendMemes(adminToken);
         setCollection(memes.map(normalizeAdminMeme));
         const activeCount = memes.filter((m) => m.status === "active").length;

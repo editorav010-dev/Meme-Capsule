@@ -86,7 +86,10 @@ export type SyncR2Response = {
   totalR2Files: number;
   alreadyInD1: number;
   newlySynced: number;
+  removedCount: number;
   syncedFiles: string[];
+  removedFiles: string[];
+  duration_ms?: number;
 };
 
 export const syncR2ToD1 = async (adminToken: string) => {
