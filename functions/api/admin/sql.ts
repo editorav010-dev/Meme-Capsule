@@ -1,8 +1,9 @@
 /**
  * POST /api/admin/sql
  *
- * Executes raw SQL queries against the D1 database.
- * Extremely powerful. Restricted to admin tokens.
+ * Executes raw SQL queries and migration scripts against the D1 database.
+ * Supports both SELECT queries and multi-statement DDL/DML batches.
+ * Restricted to admin tokens.
  */
 
 import type { PagesFunction } from "../../_shared/pages";
@@ -19,7 +20,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ success: false, error: "Missing or invalid 'query' field in request body." }, { status: 400 });
     }
     query = body.query.trim();
-  } catch (err) {
+  } catch {
     return json({ success: false, error: "Invalid JSON payload." }, { status: 400 });
   }
 
@@ -28,17 +29,43 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
-    const result = await env.DB.prepare(query).all();
+    // Check if query contains multiple statements
+    const statements = query.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+
+    if (statements.length > 1) {
+      const execResult = await env.DB.exec(query);
+      return json({
+        success: true,
+        results: [{ status: `Executed ${execResult.count ?? statements.length} statements successfully.` }],
+        meta: { duration: execResult.duration }
+      });
+    }
+
+    // Single statement: check if SELECT / read-only query
+    const single = statements[0] || query;
+    const upper = single.toUpperCase();
+
+    if (upper.startsWith("SELECT") || upper.startsWith("PRAGMA") || upper.startsWith("EXPLAIN")) {
+      const result = await env.DB.prepare(single).all();
+      return json({
+        success: true,
+        results: result.results,
+        meta: result.meta
+      });
+    }
+
+    // DDL or single modification (CREATE, INSERT, UPDATE, DELETE)
+    const execResult = await env.DB.exec(single);
     return json({
       success: true,
-      results: result.results,
-      meta: result.meta
+      results: [{ status: "Statement executed successfully." }],
+      meta: { duration: execResult.duration }
     });
-  } catch (err: any) {
-    // Return SQLite errors cleanly instead of throwing a 500
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Database execution failed.";
     return json({
       success: false,
-      error: err.message || "Database execution failed."
+      error: errorMsg
     });
   }
 };
