@@ -255,7 +255,23 @@ export default function App() {
 
       <section className="status-row" aria-label="App notes">
         <span>{notice}</span>
-        <span>{starterCount} {collectionLabel.replace(/^\d+\s/, "")}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span>{starterCount} {collectionLabel.replace(/^\d+\s/, "")}</span>
+          <a
+            href="/#/categorise"
+            style={{
+              color: "inherit",
+              opacity: 0.6,
+              textDecoration: "none",
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px"
+            }}
+            title="Categorisation Judge Portal"
+          >
+            Judge Portal
+          </a>
+        </div>
       </section>
     </main>
   );

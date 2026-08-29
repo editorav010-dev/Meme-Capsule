@@ -9,6 +9,14 @@ export type Env = {
   ANALYTICS_KV?: KVNamespace;
 };
 
+export interface CatUser {
+  id: string;
+  username: string;
+  display_name: string;
+  role: "judge" | "superadmin";
+  is_active: number;
+}
+
 export type D1MemeRow = {
   id: string;
   title: string | null;

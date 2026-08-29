@@ -1,21 +1,53 @@
-import { StrictMode } from "react";
+import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import AdminApp from "./admin/AdminApp";
 import AdminGate from "./admin/AdminGate";
+import CatApp from "./categorise/CatApp";
 import App from "./App";
 import "./styles.css";
 
-const Root = window.location.pathname.startsWith("/admin") 
-  ? () => (
+function RootRouter() {
+  const [route, setRoute] = useState(() => ({
+    pathname: window.location.pathname,
+    hash: window.location.hash
+  }));
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      setRoute({
+        pathname: window.location.pathname,
+        hash: window.location.hash
+      });
+    };
+
+    window.addEventListener("hashchange", handleNavigation);
+    window.addEventListener("popstate", handleNavigation);
+    return () => {
+      window.removeEventListener("hashchange", handleNavigation);
+      window.removeEventListener("popstate", handleNavigation);
+    };
+  }, []);
+
+  if (route.pathname.startsWith("/admin")) {
+    return (
       <div className="admin-theme" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--on-surface)" }}>
-        <AdminGate><AdminApp /></AdminGate>
+        <AdminGate>
+          <AdminApp />
+        </AdminGate>
       </div>
-    )
-  : App;
+    );
+  }
+
+  if (route.pathname.startsWith("/categorise") || route.hash.startsWith("#/categorise")) {
+    return <CatApp />;
+  }
+
+  return <App />;
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Root />
+    <RootRouter />
   </StrictMode>
 );
 
