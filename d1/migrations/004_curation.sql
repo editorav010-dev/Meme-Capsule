@@ -3,6 +3,8 @@
 -- Run: npx wrangler d1 execute meme-capsule-db --file=d1/migrations/004_curation.sql
 -- ============================================================
 
+DROP TABLE IF EXISTS meme_curation;
+
 CREATE TABLE IF NOT EXISTS meme_curation (
   id                TEXT PRIMARY KEY DEFAULT ('cur-' || hex(randomblob(6))),
   meme_id           TEXT NOT NULL,
