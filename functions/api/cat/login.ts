@@ -2,11 +2,13 @@
  * POST /api/cat/login
  * 
  * Authenticates judge / superadmin and issues an 8-hour session token.
+ * Auto-initializes users table and default judge accounts if not yet created.
  */
 
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
 import { generateToken, verifyPassword } from "../../_shared/catAuth";
+import { ensureCurationTables } from "../../_shared/curateDb";
 
 interface LoginPayload {
   username?: string;
@@ -24,6 +26,9 @@ interface UserRow {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    // Ensure all tables and seed judge accounts exist
+    await ensureCurationTables(env.DB);
+
     const body = (await request.json().catch(() => ({}))) as LoginPayload;
     const username = (body.username || "").trim();
     const password = body.password || "";
