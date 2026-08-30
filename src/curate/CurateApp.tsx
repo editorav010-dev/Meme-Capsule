@@ -12,6 +12,7 @@ import EditorialButtons from "./EditorialButtons";
 import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
 import CurateLogin from "./CurateLogin";
+import CurateSuperDashboard from "./super/CurateSuperDashboard";
 import "./curate.css";
 
 interface UndoHistoryItem {
@@ -34,6 +35,17 @@ export default function CurateApp() {
       return JSON.parse(raw);
     } catch {
       return null;
+    }
+  });
+
+  const [viewMode, setViewMode] = useState<"super" | "judge">(() => {
+    const raw = sessionStorage.getItem("curator_user");
+    if (!raw) return "judge";
+    try {
+      const u = JSON.parse(raw);
+      return u.role === "superadmin" ? "super" : "judge";
+    } catch {
+      return "judge";
     }
   });
 
@@ -86,6 +98,7 @@ export default function CurateApp() {
     sessionStorage.setItem("curator_user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    setViewMode(newUser.role === "superadmin" ? "super" : "judge");
   };
 
   const handleLogout = () => {
@@ -93,6 +106,7 @@ export default function CurateApp() {
     sessionStorage.removeItem("curator_user");
     setToken(null);
     setUser(null);
+    setViewMode("judge");
   };
 
   const preloadImage = (url: string) => {
@@ -136,10 +150,10 @@ export default function CurateApp() {
   }, [filterQueue, token]);
 
   useEffect(() => {
-    if (token) {
+    if (token && viewMode === "judge") {
       loadMeme();
     }
-  }, [token, loadMeme]);
+  }, [token, viewMode, loadMeme]);
 
   // Save current decision and advance
   const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus) => {
@@ -226,8 +240,10 @@ export default function CurateApp() {
     setNote(last.note);
   }, []);
 
-  // Conflict-free Keyboard Event Listener
+  // Conflict-free Keyboard Event Listener (Active only in Judge view)
   useEffect(() => {
+    if (viewMode !== "judge") return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
         return;
@@ -316,10 +332,20 @@ export default function CurateApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSaveAndAdvance, handleUndo, handleToggleTopic, handleSelectTone, handleToggleMechanism, loadMeme]);
+  }, [viewMode, handleSaveAndAdvance, handleUndo, handleToggleTopic, handleSelectTone, handleToggleMechanism, loadMeme]);
 
   if (!token || !user) {
     return <CurateLogin onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Superadmin Command Center View
+  if (user.role === "superadmin" && viewMode === "super") {
+    return (
+      <CurateSuperDashboard
+        onSwitchToJudgeMode={() => setViewMode("judge")}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   const percentComplete = stats.total > 0
@@ -381,8 +407,26 @@ export default function CurateApp() {
           </button>
         </div>
 
-        {/* Right: User profile and logout */}
+        {/* Right: User profile, superadmin switch and logout */}
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          {user.role === "superadmin" && (
+            <button
+              type="button"
+              onClick={() => setViewMode("super")}
+              style={{
+                background: "#f4c300",
+                color: "#121212",
+                border: "none",
+                padding: "4px 10px",
+                fontFamily: "Anton",
+                fontSize: "11px",
+                cursor: "pointer"
+              }}
+            >
+              🛡️ SUPER ADMIN VIEW
+            </button>
+          )}
+
           <span style={{ fontSize: "12px", color: "#ddd" }}>
             Curator: <strong style={{ color: "#f4c300" }}>{user.display_name}</strong>
           </span>
