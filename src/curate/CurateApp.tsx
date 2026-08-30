@@ -176,22 +176,28 @@ export default function CurateApp() {
 
     setUndoStack((prev) => [...prev.slice(-20), snapshot]);
 
-    saveCuration({
-      meme_id: s.currentMeme.id,
-      corpus_status: activeStatus,
-      duplicate_of: activeStatus === "duplicate" ? s.duplicateOf : null,
-      topics: activeStatus === "keep" ? s.topics : [],
-      tone: activeStatus === "keep" ? s.tone : null,
-      humour_mechanisms: activeStatus === "keep" ? s.mechanisms : [],
-      curator_note: s.note || null
-    }).catch(console.error);
+    try {
+      await saveCuration({
+        meme_id: s.currentMeme.id,
+        corpus_status: activeStatus,
+        duplicate_of: activeStatus === "duplicate" ? s.duplicateOf : null,
+        topics: activeStatus === "keep" ? s.topics : [],
+        tone: activeStatus === "keep" ? s.tone : null,
+        humour_mechanisms: activeStatus === "keep" ? s.mechanisms : [],
+        curator_note: s.note || null,
+        user_id: user?.id,
+        user_name: user?.display_name
+      });
+    } catch (err) {
+      console.error("Failed to save curation decision:", err);
+    }
 
     setTimeout(async () => {
       setIsSaving(false);
       stateRef.current.isSaving = false;
       await loadMeme(s.currentMeme?.id, "next");
-    }, 180);
-  }, [loadMeme]);
+    }, 120);
+  }, [user, loadMeme]);
 
   // Topic Toggle (Max 3)
   const handleToggleTopic = useCallback((topicId: string) => {
@@ -365,7 +371,7 @@ export default function CurateApp() {
           </span>
         </div>
 
-        {/* Center: Queue Selector */}
+        {/* Center: Queue Selector & Refresh */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "11px", color: "#888" }}>QUEUE:</span>
           <select
@@ -389,6 +395,24 @@ export default function CurateApp() {
             <option value="duplicate">⎘ Duplicates</option>
             <option value="all">All Corpus</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => loadMeme(currentMeme?.id)}
+            disabled={loading}
+            style={{
+              background: "#222",
+              border: "1px solid #555",
+              color: "#f4c300",
+              padding: "4px 10px",
+              fontFamily: "Anton",
+              fontSize: "12px",
+              cursor: "pointer"
+            }}
+            title="Reload queue from server"
+          >
+            {loading ? "..." : "🔄 REFRESH"}
+          </button>
 
           <button
             type="button"

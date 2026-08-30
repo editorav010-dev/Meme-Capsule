@@ -6,7 +6,7 @@
 
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
-import { requireAuth } from "../../../_shared/catAuth";
+import { validateSession } from "../../../_shared/catAuth";
 
 interface JudgeCountRow {
   user_id: string;
@@ -27,8 +27,10 @@ interface CurationRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
-    const auth = await requireAuth(request, env, "superadmin");
-    if ("error" in auth) return auth.error;
+    const sessionUser = await validateSession(request, env);
+    if (!sessionUser || sessionUser.role !== "superadmin") {
+      return json({ error: "Superadmin credentials required." }, { status: 401 });
+    }
 
     // 1. Total memes in corpus
     const totalCountRes = await env.DB.prepare(
@@ -119,6 +121,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       judges
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error generating superadmin summary";
     return json({ error: msg }, { status: 500 });
   }

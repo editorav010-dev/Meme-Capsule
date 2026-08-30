@@ -6,7 +6,7 @@
 
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
-import { requireAuth } from "../../../_shared/catAuth";
+import { validateSession } from "../../../_shared/catAuth";
 
 interface ResolvePayload {
   meme_id?: string;
@@ -20,8 +20,10 @@ interface ResolvePayload {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
-    const auth = await requireAuth(request, env, "superadmin");
-    if ("error" in auth) return auth.error;
+    const sessionUser = await validateSession(request, env);
+    if (!sessionUser || sessionUser.role !== "superadmin") {
+      return json({ error: "Superadmin credentials required." }, { status: 401 });
+    }
 
     const body = (await request.json().catch(() => ({}))) as ResolvePayload;
     const memeId = (body.meme_id || "").trim();
@@ -69,7 +71,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       tone,
       JSON.stringify(mechanisms),
       curatorNote,
-      auth.user.display_name || "Super Admin",
+      sessionUser.display_name || "Super Admin",
       now,
       now
     ).run();
@@ -87,9 +89,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       topics,
       tone,
       humour_mechanisms: mechanisms,
-      resolved_by: auth.user.display_name
+      resolved_by: sessionUser.display_name
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error resolving meme";
     return json({ error: msg }, { status: 500 });
   }

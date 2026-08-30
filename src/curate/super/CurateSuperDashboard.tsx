@@ -27,6 +27,7 @@ export default function CurateSuperDashboard({
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -39,6 +40,7 @@ export default function CurateSuperDashboard({
       setMemes(memesRes.memes);
       setTotalPages(memesRes.total_pages);
       setTotalCount(memesRes.total);
+      setLastRefreshed(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Error loading superadmin dashboard:", err);
     } finally {
@@ -77,9 +79,35 @@ export default function CurateSuperDashboard({
           <span style={{ fontSize: "11px", background: "#262626", padding: "3px 8px", borderRadius: "2px", color: "#34C759", fontFamily: "monospace" }}>
             {summary ? `${summary.resolved_count} / ${summary.total_memes} FINAL RESOLVED (${summary.percent_resolved}%)` : "LOADING..."}
           </span>
+          {lastRefreshed && (
+            <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }}>
+              SYNCED: {lastRefreshed}
+            </span>
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            style={{
+              background: "#1c1b1b",
+              color: "#f4c300",
+              border: "1px solid #f4c300",
+              padding: "6px 14px",
+              fontFamily: "Anton",
+              fontSize: "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            <span style={{ display: "inline-block", transform: loading ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}>🔄</span>
+            {loading ? "REFRESHING..." : "REFRESH DATA"}
+          </button>
+
           <button
             type="button"
             onClick={onSwitchToJudgeMode}
@@ -155,9 +183,18 @@ export default function CurateSuperDashboard({
         {/* Judges Performance Strip */}
         {summary && summary.judges.length > 0 && (
           <div style={{ background: "#181818", border: "1px solid #333", padding: "16px", marginBottom: "24px" }}>
-            <h3 className="curate-anton" style={{ margin: "0 0 12px 0", fontSize: "16px", color: "#f4c300" }}>
-              CURATOR / JUDGES LIVE PROGRESS
-            </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 className="curate-anton" style={{ margin: 0, fontSize: "16px", color: "#f4c300" }}>
+                CURATOR / JUDGES LIVE PROGRESS ({summary.judges.length} ACTIVE)
+              </h3>
+              <button
+                type="button"
+                onClick={loadData}
+                style={{ background: "transparent", border: "none", color: "#f4c300", cursor: "pointer", fontSize: "12px", fontFamily: "Oswald" }}
+              >
+                🔄 Update Counts
+              </button>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               {summary.judges.map((j) => (
                 <div key={j.user_id} style={{ background: "#222", border: "1px solid #3d3d3d", padding: "12px" }}>
@@ -224,6 +261,23 @@ export default function CurateSuperDashboard({
                 width: "240px"
               }}
             />
+
+            <button
+              type="button"
+              onClick={loadData}
+              disabled={loading}
+              style={{
+                background: "#333",
+                border: "1px solid #666",
+                color: "#fff",
+                padding: "8px 14px",
+                fontSize: "12px",
+                fontFamily: "Anton",
+                cursor: "pointer"
+              }}
+            >
+              {loading ? "LOADING..." : "🔄 RELOAD"}
+            </button>
           </div>
 
           {/* Batch Actions & Exports */}

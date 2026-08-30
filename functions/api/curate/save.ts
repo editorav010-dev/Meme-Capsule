@@ -36,8 +36,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "corpus_status must be 'keep', 'excluded', 'duplicate', or 'review_later'." }, { status: 400 });
     }
 
-    const userId = sessionUser?.id || (body.user_id || "curator-1").trim();
-    const userName = sessionUser?.display_name || (body.user_name || "Curator").trim();
+    // Determine user from session or explicit payload
+    const userId = sessionUser?.id || (body.user_id ? body.user_id.trim() : "judge1");
+    const userName = sessionUser?.display_name || (body.user_name ? body.user_name.trim() : "Judge");
 
     // Enforce taxonomy selection limits
     const rawTopics = Array.isArray(body.topics) ? body.topics.filter(Boolean) : [];
@@ -101,6 +102,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       humour_mechanisms: mechanisms
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error saving curation decision";
     return json({ error: msg }, { status: 500 });
   }

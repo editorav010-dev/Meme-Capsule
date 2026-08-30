@@ -6,7 +6,7 @@
 
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
-import { requireAuth } from "../../../_shared/catAuth";
+import { validateSession } from "../../../_shared/catAuth";
 
 interface UnanimousGroupRow {
   meme_id: string;
@@ -20,8 +20,10 @@ interface UnanimousGroupRow {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
-    const auth = await requireAuth(request, env, "superadmin");
-    if ("error" in auth) return auth.error;
+    const sessionUser = await validateSession(request, env);
+    if (!sessionUser || sessionUser.role !== "superadmin") {
+      return json({ error: "Superadmin credentials required." }, { status: 401 });
+    }
 
     const body = (await request.json().catch(() => ({}))) as { action?: string };
     const action = body.action || "unanimous_all";
@@ -83,7 +85,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           r.tone || null,
           r.humour_mechanisms || "[]",
           r.curator_note || null,
-          `Batch (${auth.user.display_name})`,
+          `Batch (${sessionUser.display_name})`,
           now,
           now
         )
@@ -107,6 +109,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       message: `Successfully resolved ${candidateRows.length} unanimous memes.`
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error bulk resolving memes";
     return json({ error: msg }, { status: 500 });
   }

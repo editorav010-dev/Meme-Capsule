@@ -6,7 +6,7 @@
 
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
-import { requireAuth } from "../../../_shared/catAuth";
+import { validateSession } from "../../../_shared/catAuth";
 
 interface MemeRow {
   id: string;
@@ -37,8 +37,10 @@ interface JudgeReviewRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
-    const auth = await requireAuth(request, env, "superadmin");
-    if ("error" in auth) return auth.error;
+    const sessionUser = await validateSession(request, env);
+    if (!sessionUser || sessionUser.role !== "superadmin") {
+      return json({ error: "Superadmin credentials required." }, { status: 401 });
+    }
 
     const url = new URL(request.url);
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
@@ -207,6 +209,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       memes: data
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error listing superadmin memes";
     return json({ error: msg }, { status: 500 });
   }

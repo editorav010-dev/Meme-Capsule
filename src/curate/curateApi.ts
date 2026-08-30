@@ -52,6 +52,8 @@ export async function saveCuration(payload: {
   tone?: string | null;
   humour_mechanisms?: string[];
   curator_note?: string | null;
+  user_id?: string;
+  user_name?: string;
 }): Promise<{ success: boolean; meme_id: string }> {
   const res = await fetch("/api/curate/save", {
     method: "POST",
