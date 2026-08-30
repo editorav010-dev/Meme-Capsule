@@ -7,6 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
+import { ensureCurationTables } from "../../../_shared/curateDb";
 
 interface FinalExportRow {
   meme_id: string;
@@ -24,6 +25,7 @@ interface FinalExportRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    await ensureCurationTables(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return new Response(JSON.stringify({ error: "Superadmin authentication required" }), {
@@ -150,7 +152,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     return new Response(JSON.stringify({ error: "Unsupported export type" }), { status: 400 });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error exporting superadmin data";
-    return new Response(JSON.stringify({ error: msg }), { status: 500 });
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 };

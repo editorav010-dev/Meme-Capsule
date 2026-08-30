@@ -7,6 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
+import { ensureCurationTables } from "../../../_shared/curateDb";
 
 interface MemeRow {
   id: string;
@@ -37,6 +38,7 @@ interface JudgeReviewRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    await ensureCurationTables(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return json({ error: "Superadmin credentials required." }, { status: 401 });

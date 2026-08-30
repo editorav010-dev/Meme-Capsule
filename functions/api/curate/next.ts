@@ -7,6 +7,7 @@
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
 import { validateSession } from "../../_shared/catAuth";
+import { ensureCurationTables } from "../../_shared/curateDb";
 
 interface MemeRow {
   id: string;
@@ -27,8 +28,9 @@ interface MemeRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    await ensureCurationTables(env.DB);
     const sessionUser = await validateSession(request, env);
-    const userId = sessionUser?.id || "curator-1";
+    const userId = sessionUser?.id || "judge1";
 
     const url = new URL(request.url);
     const filter = url.searchParams.get("filter") || "unreviewed";
@@ -166,6 +168,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       }
     });
   } catch (err: unknown) {
+    if (err instanceof Response) return err;
     const msg = err instanceof Error ? err.message : "Error fetching next curation meme";
     return json({ error: msg }, { status: 500 });
   }

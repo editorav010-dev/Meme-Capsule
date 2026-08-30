@@ -8,6 +8,7 @@
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
 import { validateSession } from "../../_shared/catAuth";
+import { ensureCurationTables } from "../../_shared/curateDb";
 
 interface SavePayload {
   meme_id?: string;
@@ -23,6 +24,7 @@ interface SavePayload {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    await ensureCurationTables(env.DB);
     const sessionUser = await validateSession(request, env);
     const body = (await request.json().catch(() => ({}))) as SavePayload;
     const memeId = (body.meme_id || "").trim();
