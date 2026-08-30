@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import AdminApp from "./admin/AdminApp";
 import AdminGate from "./admin/AdminGate";
 import CatApp from "./categorise/CatApp";
+import CurateApp from "./curate/CurateApp";
 import App from "./App";
 import "./styles.css";
 
@@ -36,6 +37,10 @@ function RootRouter() {
         </AdminGate>
       </div>
     );
+  }
+
+  if (route.pathname.startsWith("/curate") || route.hash.startsWith("#/curate")) {
+    return <CurateApp />;
   }
 
   if (route.pathname.startsWith("/categorise") || route.hash.startsWith("#/categorise")) {

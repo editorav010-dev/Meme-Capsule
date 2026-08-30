@@ -258,6 +258,20 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span>{starterCount} {collectionLabel.replace(/^\d+\s/, "")}</span>
           <a
+            href="/#/curate"
+            style={{
+              color: "inherit",
+              opacity: 0.6,
+              textDecoration: "none",
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px"
+            }}
+            title="Meme Curation & Categorization Tool"
+          >
+            Curator
+          </a>
+          <a
             href="/#/categorise"
             style={{
               color: "inherit",
