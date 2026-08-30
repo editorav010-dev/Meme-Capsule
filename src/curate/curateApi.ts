@@ -4,10 +4,17 @@
 
 import type {
   CurateMemeItem,
-  CurationCounts,
   CurationStatsResponse,
   CorpusStatus
 } from "./curateTypes";
+
+const getAuthHeaders = () => {
+  const token = sessionStorage.getItem("curator_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
@@ -31,6 +38,7 @@ export async function fetchNextMeme(
   if (direction) query.set("direction", direction);
 
   const res = await fetch(`/api/curate/next?${query.toString()}`, {
+    headers: getAuthHeaders(),
     cache: "no-store"
   });
   return handleResponse(res);
@@ -47,7 +55,7 @@ export async function saveCuration(payload: {
 }): Promise<{ success: boolean; meme_id: string }> {
   const res = await fetch("/api/curate/save", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload)
   });
   return handleResponse(res);
@@ -55,6 +63,7 @@ export async function saveCuration(payload: {
 
 export async function fetchCurationStats(): Promise<CurationStatsResponse> {
   const res = await fetch("/api/curate/stats", {
+    headers: getAuthHeaders(),
     cache: "no-store"
   });
   return handleResponse(res);
@@ -82,6 +91,7 @@ export async function fetchCurationList(
   });
 
   const res = await fetch(`/api/curate/list?${query.toString()}`, {
+    headers: getAuthHeaders(),
     cache: "no-store"
   });
   return handleResponse(res);

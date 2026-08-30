@@ -1,3 +1,4 @@
+import React from "react";
 import {
   CURATION_TOPICS,
   CURATION_TONES,
@@ -46,11 +47,16 @@ export default function CategorizationPanel({
                 key={t.id}
                 type="button"
                 className={`curate-pill ${isSelected ? "selected" : ""}`}
-                style={{ "--pill-color": "#9b30ff" } as React.CSSProperties}
+                style={{
+                  "--pill-color": "#9b30ff",
+                  background: isSelected ? "#9b30ff" : "#242424",
+                  color: isSelected ? "#ffffff" : "#dddddd",
+                  borderColor: isSelected ? "#f4c300" : "#444"
+                } as React.CSSProperties}
                 onClick={() => onToggleTopic(t.id)}
-                title={`Key: ${t.key}`}
+                title={`Hotkey: ${t.key}`}
               >
-                <span className="curate-pill-key">{t.key}</span>
+                <span className="curate-pill-key">[{t.key}]</span>
                 <span>{t.label}</span>
               </button>
             );
@@ -65,7 +71,7 @@ export default function CategorizationPanel({
             2. DOMINANT TONE (EMOTIONAL ATMOSPHERE)
           </span>
           <span style={{ fontSize: "12px", color: "#888" }}>
-            1 DOMINANT TONE
+            {tone ? `SELECTED: ${tone.toUpperCase()}` : "1 DOMINANT TONE [Q, W, E, A, S, F]"}
           </span>
         </div>
 
@@ -77,11 +83,17 @@ export default function CategorizationPanel({
                 key={t.id}
                 type="button"
                 className={`curate-pill ${isSelected ? "selected" : ""}`}
-                style={{ "--pill-color": t.color } as React.CSSProperties}
+                style={{
+                  "--pill-color": t.color,
+                  background: isSelected ? t.color : "#242424",
+                  color: isSelected ? "#121212" : "#dddddd",
+                  borderColor: isSelected ? "#ffffff" : "#444",
+                  fontWeight: isSelected ? "bold" : "normal"
+                } as React.CSSProperties}
                 onClick={() => onSelectTone(t.id)}
-                title={`Key: ${t.key}`}
+                title={`Hotkey: ${t.key}`}
               >
-                <span className="curate-pill-key">{t.key}</span>
+                <span className="curate-pill-key">[{t.key}]</span>
                 <span>{t.label}</span>
               </button>
             );
@@ -108,11 +120,17 @@ export default function CategorizationPanel({
                 key={m.id}
                 type="button"
                 className={`curate-pill ${isSelected ? "selected" : ""}`}
-                style={{ "--pill-color": "#5AC8FA" } as React.CSSProperties}
+                style={{
+                  "--pill-color": "#5AC8FA",
+                  background: isSelected ? "#5AC8FA" : "#242424",
+                  color: isSelected ? "#121212" : "#dddddd",
+                  borderColor: isSelected ? "#ffffff" : "#444",
+                  fontWeight: isSelected ? "bold" : "normal"
+                } as React.CSSProperties}
                 onClick={() => onToggleMechanism(m.id)}
-                title={`Key: ${m.key}`}
+                title={`Hotkey: ${m.key}`}
               >
-                <span className="curate-pill-key">{m.key}</span>
+                <span className="curate-pill-key">[{m.key}]</span>
                 <span>{m.label}</span>
               </button>
             );

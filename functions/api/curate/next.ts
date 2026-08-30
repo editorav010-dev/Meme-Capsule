@@ -1,11 +1,12 @@
 /**
  * GET /api/curate/next
  * 
- * Fetches the next/previous meme in the chosen curation queue.
+ * Fetches the next/previous meme in the chosen curation queue for the current curator.
  */
 
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
+import { validateSession } from "../../_shared/catAuth";
 
 interface MemeRow {
   id: string;
@@ -18,12 +19,17 @@ interface MemeRow {
   tone: string | null;
   humour_mechanisms: string | null;
   curator_note: string | null;
+  user_id: string | null;
+  user_name: string | null;
   reviewed_at: string | null;
   updated_at: string | null;
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    const sessionUser = await validateSession(request, env);
+    const userId = sessionUser?.id || "curator-1";
+
     const url = new URL(request.url);
     const filter = url.searchParams.get("filter") || "unreviewed";
     const currentId = url.searchParams.get("current_id") || "";
@@ -37,8 +43,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const total = totalCountRes?.cnt ?? 0;
 
     const reviewedCountRes = await env.DB.prepare(
-      "SELECT COUNT(*) as cnt FROM meme_curation"
-    ).first<{ cnt: number }>();
+      "SELECT COUNT(*) as cnt FROM meme_curation WHERE user_id = ?"
+    ).bind(userId).first<{ cnt: number }>();
     const reviewed = reviewedCountRes?.cnt ?? 0;
     const remaining = Math.max(0, total - reviewed);
 
@@ -59,7 +65,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     let targetMeme: MemeRow | null = null;
 
     if (currentId) {
-      // Find current meme's row index or uploaded_at
       const currentMeme = await env.DB.prepare(
         "SELECT id, uploaded_at, random_key FROM memes WHERE id = ?"
       ).bind(currentId).first<{ id: string; uploaded_at: string; random_key: number }>();
@@ -72,13 +77,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           SELECT 
             m.id, m.title, m.image_url, m.storage_path,
             c.corpus_status, c.duplicate_of, c.topics, c.tone,
-            c.humour_mechanisms, c.curator_note, c.reviewed_at, c.updated_at
+            c.humour_mechanisms, c.curator_note, c.user_id, c.user_name,
+            c.reviewed_at, c.updated_at
           FROM memes m
-          LEFT JOIN meme_curation c ON m.id = c.meme_id
+          LEFT JOIN meme_curation c ON m.id = c.meme_id AND c.user_id = ?
           ${whereClause} AND m.uploaded_at ${orderOp} ?
           ORDER BY m.uploaded_at ${orderDir}
           LIMIT 1
-        `).bind(currentMeme.uploaded_at).first<MemeRow>();
+        `).bind(userId, currentMeme.uploaded_at).first<MemeRow>();
       }
     }
 
@@ -88,13 +94,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         SELECT 
           m.id, m.title, m.image_url, m.storage_path,
           c.corpus_status, c.duplicate_of, c.topics, c.tone,
-          c.humour_mechanisms, c.curator_note, c.reviewed_at, c.updated_at
+          c.humour_mechanisms, c.curator_note, c.user_id, c.user_name,
+          c.reviewed_at, c.updated_at
         FROM memes m
-        LEFT JOIN meme_curation c ON m.id = c.meme_id
+        LEFT JOIN meme_curation c ON m.id = c.meme_id AND c.user_id = ?
         ${whereClause}
         ORDER BY m.uploaded_at ASC
         LIMIT 1
-      `).first<MemeRow>();
+      `).bind(userId).first<MemeRow>();
     }
 
     if (!targetMeme) {
@@ -145,6 +152,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           tone: targetMeme.tone,
           humour_mechanisms: mechanismsList,
           curator_note: targetMeme.curator_note,
+          user_id: targetMeme.user_id,
+          user_name: targetMeme.user_name,
           reviewed_at: targetMeme.reviewed_at,
           updated_at: targetMeme.updated_at
         } : null

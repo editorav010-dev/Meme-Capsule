@@ -23,22 +23,29 @@ export const CURATION_TONES = [
   { id: "Chaotic",   key: "E", label: "Chaotic",   color: "#FF9F0A" },
   { id: "Cynical",   key: "A", label: "Cynical",   color: "#9b30ff" },
   { id: "Awkward",   key: "S", label: "Awkward",   color: "#f4c300" },
-  { id: "Neutral",   key: "D", label: "Neutral",   color: "#5AC8FA" }
+  { id: "Neutral",   key: "F", label: "Neutral",   color: "#5AC8FA" }
 ] as const;
 
 export const CURATION_MECHANISMS = [
   { id: "Relatability", key: "Z", label: "Relatability" },
-  { id: "Absurdity",    key: "X", label: "Absurdity" },
-  { id: "Irony",        key: "C", label: "Irony" },
-  { id: "Satire",       key: "V", label: "Satire" },
-  { id: "Exaggeration", key: "B", label: "Exaggeration" },
-  { id: "Cringe",       key: "N", label: "Cringe" },
-  { id: "Dark Humour",  key: "M", label: "Dark Humour" },
+  { id: "Absurdity",    key: "C", label: "Absurdity" },
+  { id: "Irony",        key: "V", label: "Irony" },
+  { id: "Satire",       key: "B", label: "Satire" },
+  { id: "Exaggeration", key: "N", label: "Exaggeration" },
+  { id: "Cringe",       key: "M", label: "Cringe" },
+  { id: "Dark Humour",  key: "J", label: "Dark Humour" },
   { id: "Parody",       key: "P", label: "Parody" },
   { id: "Surrealism",   key: "O", label: "Surrealism" }
 ] as const;
 
 export type CorpusStatus = "keep" | "excluded" | "duplicate" | "review_later";
+
+export interface CuratorUser {
+  id: string;
+  username: string;
+  display_name: string;
+  role: "judge" | "superadmin";
+}
 
 export interface CuratedMemeData {
   corpus_status: CorpusStatus;
@@ -47,6 +54,8 @@ export interface CuratedMemeData {
   tone?: string | null;
   humour_mechanisms: string[];
   curator_note?: string | null;
+  user_id?: string;
+  user_name?: string;
   reviewed_at?: string;
   updated_at?: string;
 }
@@ -70,16 +79,17 @@ export interface CurationCounts {
   percent_complete: number;
 }
 
-export interface DistributionItem {
-  topic?: string;
-  tone?: string;
-  mechanism?: string;
-  count: number;
-  percent: number;
-}
-
 export interface CurationStatsResponse {
   counts: CurationCounts;
+  user_progress?: {
+    user_id: string;
+    display_name: string;
+    reviewed: number;
+    kept: number;
+    excluded: number;
+    duplicates: number;
+    review_later: number;
+  }[];
   distributions: {
     topics: { topic: string; count: number; percent: number }[];
     tones: { tone: string; count: number; percent: number }[];

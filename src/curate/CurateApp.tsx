@@ -4,12 +4,14 @@ import {
   CURATION_TONES,
   CURATION_MECHANISMS,
   type CurateMemeItem,
-  type CorpusStatus
+  type CorpusStatus,
+  type CuratorUser
 } from "./curateTypes";
-import { fetchNextMeme, saveCuration, getExportUrl } from "./curateApi";
+import { fetchNextMeme, saveCuration } from "./curateApi";
 import EditorialButtons from "./EditorialButtons";
 import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
+import CurateLogin from "./CurateLogin";
 import "./curate.css";
 
 interface UndoHistoryItem {
@@ -23,6 +25,18 @@ interface UndoHistoryItem {
 }
 
 export default function CurateApp() {
+  // Authentication State
+  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem("curator_token"));
+  const [user, setUser] = useState<CuratorUser | null>(() => {
+    const raw = sessionStorage.getItem("curator_user");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  });
+
   const [currentMeme, setCurrentMeme] = useState<CurateMemeItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [filterQueue, setFilterQueue] = useState<string>("unreviewed");
@@ -40,7 +54,46 @@ export default function CurateApp() {
   const [undoStack, setUndoStack] = useState<UndoHistoryItem[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  const isSavingRef = useRef(false);
+  // Refs for zero-latency keyboard shortcut execution (prevents stale closure issues)
+  const stateRef = useRef({
+    status,
+    topics,
+    tone,
+    mechanisms,
+    duplicateOf,
+    note,
+    currentMeme,
+    isSaving: false,
+    undoStack
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      status,
+      topics,
+      tone,
+      mechanisms,
+      duplicateOf,
+      note,
+      currentMeme,
+      isSaving,
+      undoStack
+    };
+  }, [status, topics, tone, mechanisms, duplicateOf, note, currentMeme, isSaving, undoStack]);
+
+  const handleLoginSuccess = (newToken: string, newUser: CuratorUser) => {
+    sessionStorage.setItem("curator_token", newToken);
+    sessionStorage.setItem("curator_user", JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("curator_token");
+    sessionStorage.removeItem("curator_user");
+    setToken(null);
+    setUser(null);
+  };
 
   const preloadImage = (url: string) => {
     if (!url) return;
@@ -49,6 +102,7 @@ export default function CurateApp() {
   };
 
   const loadMeme = useCallback(async (currentId?: string, direction: "next" | "prev" = "next") => {
+    if (!token) return;
     try {
       setLoading(true);
       const res = await fetchNextMeme(filterQueue, currentId, direction);
@@ -58,7 +112,6 @@ export default function CurateApp() {
       if (res.meme) {
         preloadImage(res.meme.image_url);
 
-        // Populate existing curation metadata if already reviewed
         if (res.meme.curation) {
           setStatus(res.meme.curation.corpus_status);
           setTopics(res.meme.curation.topics || []);
@@ -67,7 +120,6 @@ export default function CurateApp() {
           setDuplicateOf(res.meme.curation.duplicate_of || "");
           setNote(res.meme.curation.curator_note || "");
         } else {
-          // Fresh state
           setStatus(null);
           setTopics([]);
           setTone(null);
@@ -81,50 +133,51 @@ export default function CurateApp() {
     } finally {
       setLoading(false);
     }
-  }, [filterQueue]);
+  }, [filterQueue, token]);
 
   useEffect(() => {
-    loadMeme();
-  }, [loadMeme]);
+    if (token) {
+      loadMeme();
+    }
+  }, [token, loadMeme]);
 
   // Save current decision and advance
   const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus) => {
-    if (!currentMeme || isSavingRef.current) return;
-    const activeStatus = forcedStatus || status || "keep";
+    const s = stateRef.current;
+    if (!s.currentMeme || s.isSaving) return;
+    const activeStatus = forcedStatus || s.status || "keep";
 
-    isSavingRef.current = true;
     setIsSaving(true);
+    stateRef.current.isSaving = true;
 
     const snapshot: UndoHistoryItem = {
-      meme: currentMeme,
+      meme: s.currentMeme,
       status: activeStatus,
-      topics,
-      tone,
-      mechanisms,
-      duplicateOf,
-      note
+      topics: s.topics,
+      tone: s.tone,
+      mechanisms: s.mechanisms,
+      duplicateOf: s.duplicateOf,
+      note: s.note
     };
 
     setUndoStack((prev) => [...prev.slice(-20), snapshot]);
 
-    // Incremental async save
     saveCuration({
-      meme_id: currentMeme.id,
+      meme_id: s.currentMeme.id,
       corpus_status: activeStatus,
-      duplicate_of: activeStatus === "duplicate" ? duplicateOf : null,
-      topics: activeStatus === "keep" ? topics : [],
-      tone: activeStatus === "keep" ? tone : null,
-      humour_mechanisms: activeStatus === "keep" ? mechanisms : [],
-      curator_note: note || null
+      duplicate_of: activeStatus === "duplicate" ? s.duplicateOf : null,
+      topics: activeStatus === "keep" ? s.topics : [],
+      tone: activeStatus === "keep" ? s.tone : null,
+      humour_mechanisms: activeStatus === "keep" ? s.mechanisms : [],
+      curator_note: s.note || null
     }).catch(console.error);
 
-    // Fast advance
     setTimeout(async () => {
-      isSavingRef.current = false;
       setIsSaving(false);
-      await loadMeme(currentMeme.id, "next");
+      stateRef.current.isSaving = false;
+      await loadMeme(s.currentMeme?.id, "next");
     }, 180);
-  }, [currentMeme, status, topics, tone, mechanisms, duplicateOf, note, loadMeme]);
+  }, [loadMeme]);
 
   // Topic Toggle (Max 3)
   const handleToggleTopic = useCallback((topicId: string) => {
@@ -133,7 +186,7 @@ export default function CurateApp() {
         return prev.filter((t) => t !== topicId);
       }
       if (prev.length >= 3) {
-        return [...prev.slice(1), topicId]; // Shift oldest or cap
+        return [...prev.slice(1), topicId];
       }
       return [...prev, topicId];
     });
@@ -151,7 +204,7 @@ export default function CurateApp() {
         return prev.filter((m) => m !== mechId);
       }
       if (prev.length >= 2) {
-        return [...prev.slice(1), mechId]; // Shift oldest or cap
+        return [...prev.slice(1), mechId];
       }
       return [...prev, mechId];
     });
@@ -159,8 +212,9 @@ export default function CurateApp() {
 
   // Undo Last Action
   const handleUndo = useCallback(() => {
-    if (undoStack.length === 0 || isSavingRef.current) return;
-    const last = undoStack[undoStack.length - 1];
+    const s = stateRef.current;
+    if (s.undoStack.length === 0 || s.isSaving) return;
+    const last = s.undoStack[s.undoStack.length - 1];
     setUndoStack((prev) => prev.slice(0, -1));
 
     setCurrentMeme(last.meme);
@@ -170,9 +224,9 @@ export default function CurateApp() {
     setMechanisms(last.mechanisms);
     setDuplicateOf(last.duplicateOf);
     setNote(last.note);
-  }, [undoStack]);
+  }, []);
 
-  // Global Keyboard Navigation
+  // Conflict-free Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
@@ -181,7 +235,7 @@ export default function CurateApp() {
 
       const key = e.key.toLowerCase();
 
-      // Editorial Shortcuts
+      // 1. Layer 0 Editorial Shortcuts
       if (key === "k") {
         e.preventDefault();
         setStatus("keep");
@@ -205,44 +259,68 @@ export default function CurateApp() {
         return;
       }
 
-      // Enter / Space confirms & advances
+      // 2. Save / Advance on Enter or Space
       if (e.key === "Enter" || e.code === "Space") {
         e.preventDefault();
         handleSaveAndAdvance();
         return;
       }
 
-      // Undo on Z or U
-      if ((key === "z" || key === "u") && !e.ctrlKey && !e.metaKey) {
+      // 3. Undo on U or Backspace
+      if (key === "u" || e.key === "Backspace") {
         e.preventDefault();
         handleUndo();
         return;
       }
 
-      // Prev / Next on Left/Right Arrows
-      if (e.key === "ArrowLeft" && currentMeme) {
+      // 4. Prev / Next on Left/Right Arrows
+      if (e.key === "ArrowLeft") {
         e.preventDefault();
-        loadMeme(currentMeme.id, "prev");
+        if (stateRef.current.currentMeme) {
+          loadMeme(stateRef.current.currentMeme.id, "prev");
+        }
         return;
       }
-      if (e.key === "ArrowRight" && currentMeme) {
+      if (e.key === "ArrowRight") {
         e.preventDefault();
-        loadMeme(currentMeme.id, "next");
+        if (stateRef.current.currentMeme) {
+          loadMeme(stateRef.current.currentMeme.id, "next");
+        }
         return;
       }
 
-      // Topic shortcuts (1 to 9, 0, -, =)
+      // 5. Topics shortcuts: 1-9, 0, -, =
       const matchedTopic = CURATION_TOPICS.find((t) => t.key.toLowerCase() === key);
       if (matchedTopic) {
         e.preventDefault();
         handleToggleTopic(matchedTopic.id);
         return;
       }
+
+      // 6. Tones shortcuts: Q, W, E, A, S, F
+      const matchedTone = CURATION_TONES.find((t) => t.key.toLowerCase() === key);
+      if (matchedTone) {
+        e.preventDefault();
+        handleSelectTone(matchedTone.id);
+        return;
+      }
+
+      // 7. Mechanisms shortcuts: Z, C, V, B, N, M, J, P, O
+      const matchedMech = CURATION_MECHANISMS.find((m) => m.key.toLowerCase() === key);
+      if (matchedMech) {
+        e.preventDefault();
+        handleToggleMechanism(matchedMech.id);
+        return;
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentMeme, handleSaveAndAdvance, handleUndo, handleToggleTopic, loadMeme]);
+  }, [handleSaveAndAdvance, handleUndo, handleToggleTopic, handleSelectTone, handleToggleMechanism, loadMeme]);
+
+  if (!token || !user) {
+    return <CurateLogin onLoginSuccess={handleLoginSuccess} />;
+  }
 
   const percentComplete = stats.total > 0
     ? Math.min(100, Math.round((stats.reviewed / stats.total) * 100))
@@ -261,7 +339,7 @@ export default function CurateApp() {
           </span>
         </div>
 
-        {/* Queue Selector */}
+        {/* Center: Queue Selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "11px", color: "#888" }}>QUEUE:</span>
           <select
@@ -303,6 +381,28 @@ export default function CurateApp() {
           </button>
         </div>
 
+        {/* Right: User profile and logout */}
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <span style={{ fontSize: "12px", color: "#ddd" }}>
+            Curator: <strong style={{ color: "#f4c300" }}>{user.display_name}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#FF3B30",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontFamily: "Oswald",
+              letterSpacing: "0.5px"
+            }}
+          >
+            LOG OUT
+          </button>
+        </div>
+
         {/* Progress Bar Line */}
         <div className="curate-progress-bar">
           <div className="curate-progress-fill" style={{ width: `${percentComplete}%` }} />
@@ -339,6 +439,7 @@ export default function CurateApp() {
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button
+                  type="button"
                   onClick={() => loadMeme(currentMeme.id, "prev")}
                   style={{ background: "#222", border: "1px solid #444", color: "#fff", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
                   title="Previous Meme (Left Arrow)"
@@ -346,6 +447,7 @@ export default function CurateApp() {
                   ← PREV
                 </button>
                 <button
+                  type="button"
                   onClick={() => loadMeme(currentMeme.id, "next")}
                   style={{ background: "#222", border: "1px solid #444", color: "#fff", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
                   title="Next Meme (Right Arrow)"
@@ -419,9 +521,9 @@ export default function CurateApp() {
                 cursor: "pointer",
                 opacity: undoStack.length ? 1 : 0.4
               }}
-              title="Undo last action [Key: Z]"
+              title="Undo last action [Key: U / Backspace]"
             >
-              UNDO [Z]
+              UNDO [U]
             </button>
           </div>
         </section>
@@ -432,10 +534,12 @@ export default function CurateApp() {
         <span><span className="curate-hotkey-tag">K</span> KEEP</span>
         <span><span className="curate-hotkey-tag">X</span> EXCLUDE</span>
         <span><span className="curate-hotkey-tag">D</span> DUPLICATE</span>
-        <span><span className="curate-hotkey-tag">R</span> REVIEW LATER</span>
+        <span><span className="curate-hotkey-tag">R</span> LATER</span>
         <span><span className="curate-hotkey-tag">1-9,0,-,=</span> TOPICS (MAX 3)</span>
+        <span><span className="curate-hotkey-tag">Q,W,E,A,S,F</span> TONE (1)</span>
+        <span><span className="curate-hotkey-tag">Z,C,V,B,N,M,J,P,O</span> MECHANISM (MAX 2)</span>
         <span><span className="curate-hotkey-tag">ENTER</span> CONFIRM</span>
-        <span><span className="curate-hotkey-tag">Z</span> UNDO</span>
+        <span><span className="curate-hotkey-tag">U</span> UNDO</span>
         <span><span className="curate-hotkey-tag">←/→</span> PREV/NEXT</span>
       </footer>
 

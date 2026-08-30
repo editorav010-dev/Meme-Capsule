@@ -1,3 +1,4 @@
+import React from "react";
 import type { CorpusStatus } from "./curateTypes";
 
 interface EditorialButtonsProps {
@@ -15,12 +16,12 @@ export default function EditorialButtons({
 }: EditorialButtonsProps) {
   return (
     <div>
-      <div style={{ marginBottom: "6px", display: "flex", justifyContent: "space-between" }}>
-        <span className="curate-anton" style={{ fontSize: "14px", color: "#f4c300" }}>
+      <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className="curate-anton" style={{ fontSize: "15px", color: "#f4c300" }}>
           LAYER 0 — EDITORIAL ACTION
         </span>
-        <span style={{ fontSize: "11px", color: "#888" }}>
-          DECIDE CORPUS STATUS FIRST
+        <span style={{ fontSize: "11px", color: "#aaa" }}>
+          {currentStatus ? `SELECTED: ${currentStatus.toUpperCase()}` : "SELECT ACTION [K, X, D, R]"}
         </span>
       </div>
 
@@ -29,52 +30,68 @@ export default function EditorialButtons({
         <button
           type="button"
           className={`curate-action-btn ${currentStatus === "keep" ? "active" : ""}`}
-          style={{ "--btn-border": "#34C759" } as React.CSSProperties}
+          style={{
+            "--btn-border": "#34C759",
+            background: currentStatus === "keep" ? "#34C759" : "#1c1b1b",
+            color: currentStatus === "keep" ? "#121212" : "#ffffff"
+          } as React.CSSProperties}
           onClick={() => onSelectStatus("keep")}
           title="Keep in active collection [Key: K]"
         >
           <span className="curate-key-pill">[K]</span>
-          <span className="curate-anton" style={{ fontSize: "15px" }}>KEEP</span>
-          <span style={{ fontSize: "10px", opacity: 0.7 }}>Active Corpus</span>
+          <span className="curate-anton" style={{ fontSize: "16px" }}>KEEP</span>
+          <span style={{ fontSize: "10px", opacity: 0.8 }}>Active Corpus</span>
         </button>
 
         {/* EXCLUDE */}
         <button
           type="button"
           className={`curate-action-btn ${currentStatus === "excluded" ? "active" : ""}`}
-          style={{ "--btn-border": "#FF3B30" } as React.CSSProperties}
+          style={{
+            "--btn-border": "#FF3B30",
+            background: currentStatus === "excluded" ? "#FF3B30" : "#1c1b1b",
+            color: currentStatus === "excluded" ? "#ffffff" : "#ffffff"
+          } as React.CSSProperties}
           onClick={() => onSelectStatus("excluded")}
           title="Exclude from active collection [Key: X]"
         >
           <span className="curate-key-pill">[X]</span>
-          <span className="curate-anton" style={{ fontSize: "15px" }}>EXCLUDE</span>
-          <span style={{ fontSize: "10px", opacity: 0.7 }}>Reversible</span>
+          <span className="curate-anton" style={{ fontSize: "16px" }}>EXCLUDE</span>
+          <span style={{ fontSize: "10px", opacity: 0.8 }}>Reversible</span>
         </button>
 
         {/* DUPLICATE */}
         <button
           type="button"
           className={`curate-action-btn ${currentStatus === "duplicate" ? "active" : ""}`}
-          style={{ "--btn-border": "#FF9F0A" } as React.CSSProperties}
+          style={{
+            "--btn-border": "#FF9F0A",
+            background: currentStatus === "duplicate" ? "#FF9F0A" : "#1c1b1b",
+            color: currentStatus === "duplicate" ? "#121212" : "#ffffff"
+          } as React.CSSProperties}
           onClick={() => onSelectStatus("duplicate")}
           title="Mark as duplicate meme [Key: D]"
         >
           <span className="curate-key-pill">[D]</span>
-          <span className="curate-anton" style={{ fontSize: "15px" }}>DUPLICATE</span>
-          <span style={{ fontSize: "10px", opacity: 0.7 }}>Mark Copy</span>
+          <span className="curate-anton" style={{ fontSize: "16px" }}>DUPLICATE</span>
+          <span style={{ fontSize: "10px", opacity: 0.8 }}>Mark Copy</span>
         </button>
 
         {/* REVIEW LATER */}
         <button
           type="button"
           className={`curate-action-btn ${currentStatus === "review_later" ? "active" : ""}`}
-          style={{ "--btn-border": "#f4c300" } as React.CSSProperties}
+          style={{
+            "--btn-border": "#f4c300",
+            background: currentStatus === "review_later" ? "#f4c300" : "#1c1b1b",
+            color: currentStatus === "review_later" ? "#121212" : "#ffffff"
+          } as React.CSSProperties}
           onClick={() => onSelectStatus("review_later")}
           title="Defer to review later queue [Key: R]"
         >
           <span className="curate-key-pill">[R]</span>
-          <span className="curate-anton" style={{ fontSize: "15px" }}>LATER</span>
-          <span style={{ fontSize: "10px", opacity: 0.7 }}>Defer Queue</span>
+          <span className="curate-anton" style={{ fontSize: "16px" }}>LATER</span>
+          <span style={{ fontSize: "10px", opacity: 0.8 }}>Defer Queue</span>
         </button>
       </div>
 
@@ -84,7 +101,7 @@ export default function EditorialButtons({
           <span style={{ fontSize: "12px", color: "#FF9F0A", fontWeight: "bold" }}>DUPLICATE OF MEME ID:</span>
           <input
             type="text"
-            placeholder="e.g. meme-1234abcd"
+            placeholder="e.g. meme-1234abcd (or leave blank)"
             value={duplicateOf}
             onChange={(e) => onChangeDuplicateOf(e.target.value)}
             style={{
@@ -94,7 +111,8 @@ export default function EditorialButtons({
               padding: "4px 8px",
               fontFamily: "monospace",
               fontSize: "12px",
-              flex: 1
+              flex: 1,
+              outline: "none"
             }}
           />
         </div>
