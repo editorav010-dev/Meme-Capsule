@@ -1,5 +1,7 @@
 # Meme Capsule - Project Context
 
+> **CRITICAL**: All AI coding agents must read and adhere to [`AGENT_RULES.md`](./AGENT_RULES.md) before making changes.
+
 ## Project Overview
 **Meme Capsule** is a high-performance, minimalist curated meme platform built as a Progressive Web App (PWA). It features a "mobile-first" approach and a playful interface to "Spawn a Random Meme" or view a "Daily Drop".
 

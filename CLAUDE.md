@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **CRITICAL**: Before modifying this repository, read and follow [`AGENT_RULES.md`](./AGENT_RULES.md).
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Development Setup
