@@ -1,4 +1,4 @@
-const CACHE_NAME = "meme-capsule-shell-v1";
+const CACHE_NAME = "meme-capsule-shell-v2";
 const SHELL_ASSETS = ["/", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -25,7 +25,12 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== "GET" || url.pathname.startsWith("/api/")) {
+  if (
+    request.method !== "GET" ||
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/admin") ||
+    url.pathname.startsWith("/curate")
+  ) {
     return;
   }
 
