@@ -234,7 +234,7 @@ export default function AiJudgeConsole({
           ) : isRunning ? (
             <button
               type="button"
-              onClick={onStop}
+              onClick={() => onStop()}
               style={{
                 padding: "6px 18px",
                 background: "#FF3B30",
@@ -252,7 +252,7 @@ export default function AiJudgeConsole({
           ) : (
             <button
               type="button"
-              onClick={onStart}
+              onClick={() => onStart()}
               style={{
                 padding: "6px 18px",
                 background: "#34C759",

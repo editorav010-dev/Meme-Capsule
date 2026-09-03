@@ -7,7 +7,7 @@ interface UseAiJudgeLoopProps {
   currentMeme: CurateMemeItem | null;
   config: AiJudgeConfig;
   onApplyDecision: (decision: AiJudgeDecision) => void;
-  onAdvance: () => Promise<void>;
+  onAdvance: () => Promise<CurateMemeItem | null>;
 }
 
 export function useAiJudgeLoop({
@@ -24,22 +24,23 @@ export function useAiJudgeLoop({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [batchProcessed, setBatchProcessed] = useState(0);
 
-  // References to handle async cancellations without stale closures
+  // References to prevent stale closure bugs in continuous loop
   const isRunningRef = useRef(false);
   const currentMemeRef = useRef(currentMeme);
   const configRef = useRef(config);
   const timerRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const processedMemeIdsRef = useRef<Set<string>>(new Set());
+  const inFlightMemeIdRef = useRef<string | null>(null);
+  const processedCountRef = useRef(0);
 
   useEffect(() => {
-    isRunningRef.current = isRunning;
     currentMemeRef.current = currentMeme;
-    configRef.current = config;
-  }, [isRunning, currentMeme, config]);
+  }, [currentMeme]);
 
-  // Clear all background timers
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
   const clearTimers = useCallback(() => {
     if (timerRef.current) {
       window.clearTimeout(timerRef.current);
@@ -51,102 +52,124 @@ export function useAiJudgeLoop({
     }
   }, []);
 
-  const stop = useCallback((msg = "AI Mode stopped by user") => {
+  const stop = useCallback((msg?: unknown) => {
     clearTimers();
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
     isRunningRef.current = false;
+    inFlightMemeIdRef.current = null;
     setIsRunning(false);
     setLoopState("stopped");
-    setStatusMessage(msg);
     setPreviewProgress(0);
+
+    // Safeguard against React MouseEvent objects passed by onClick={onStop}
+    const safeMsg = typeof msg === "string" ? msg : "AI Mode stopped by user";
+    setStatusMessage(safeMsg);
   }, [clearTimers]);
 
-  // Execute a single judging step for the active meme
-  const judgeActiveMeme = useCallback(async (meme: CurateMemeItem) => {
+  // Main processing pipeline for a single meme
+  const processMeme = useCallback(async (meme: CurateMemeItem) => {
     if (!isRunningRef.current) return;
 
-    // Check batch limit if in count mode
+    // Check batch limit if configured
     if (
       configRef.current.batchMode === "count" &&
-      processedMemeIdsRef.current.size >= configRef.current.batchCount
+      processedCountRef.current >= configRef.current.batchCount
     ) {
       stop(`Batch limit reached (${configRef.current.batchCount} memes evaluated)`);
       return;
     }
 
+    inFlightMemeIdRef.current = meme.id;
     setLoopState("analyzing");
     setStatusMessage(`Analyzing meme: ${meme.id}...`);
     setErrorMessage(null);
     setPreviewProgress(0);
 
+    let decision: AiJudgeDecision;
     try {
-      const decision = await analyzeMemeWithAi(meme, configRef.current);
-      if (!isRunningRef.current) return;
-
-      // Apply decisions directly to the UI
-      onApplyDecision(decision);
-      setLastDecision(decision);
-
-      // Start live countdown preview
-      setLoopState("previewing");
-      setStatusMessage(`Previewing decisions for ${configRef.current.previewDelayMs}ms...`);
-
-      const totalDelay = configRef.current.previewDelayMs;
-      const stepMs = 50;
-      let elapsed = 0;
-
-      clearTimers();
-
-      progressIntervalRef.current = window.setInterval(() => {
-        elapsed += stepMs;
-        const pct = Math.min(100, Math.round((elapsed / totalDelay) * 100));
-        setPreviewProgress(pct);
-
-        if (elapsed >= totalDelay) {
-          clearTimers();
-        }
-      }, stepMs);
-
-      timerRef.current = window.setTimeout(async () => {
-        if (!isRunningRef.current) return;
-
-        setLoopState("saving");
-        setStatusMessage(`Saving and advancing...`);
-        processedMemeIdsRef.current.add(meme.id);
-        setBatchProcessed(processedMemeIdsRef.current.size);
-
-        try {
-          await onAdvance();
-        } catch (saveErr) {
-          console.error("Auto advance save error:", saveErr);
-        }
-      }, totalDelay);
+      decision = await analyzeMemeWithAi(meme, configRef.current);
     } catch (err: unknown) {
       if (!isRunningRef.current) return;
       const errText = err instanceof Error ? err.message : "AI Analysis failed";
       setErrorMessage(errText);
-      setLoopState("error");
-      setStatusMessage(`Error: ${errText}`);
-      // Auto pause on failure so user can fix or inspect
       stop(`Paused due to error: ${errText}`);
+      return;
+    }
+
+    if (!isRunningRef.current) return;
+
+    // 1. Populate visual UI state
+    onApplyDecision(decision);
+    setLastDecision(decision);
+
+    // 2. Start live visual countdown preview
+    setLoopState("previewing");
+    setStatusMessage(`Previewing decision (${configRef.current.previewDelayMs}ms)...`);
+
+    const totalDelay = configRef.current.previewDelayMs;
+    const stepMs = 50;
+    let elapsed = 0;
+
+    clearTimers();
+
+    progressIntervalRef.current = window.setInterval(() => {
+      elapsed += stepMs;
+      const pct = Math.min(100, Math.round((elapsed / totalDelay) * 100));
+      setPreviewProgress(pct);
+
+      if (elapsed >= totalDelay && progressIntervalRef.current) {
+        window.clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }, stepMs);
+
+    // Wait for the preview pause
+    await new Promise<void>((resolve) => {
+      timerRef.current = window.setTimeout(() => {
+        resolve();
+      }, totalDelay);
+    });
+
+    if (!isRunningRef.current) return;
+
+    // 3. Save decision and request next meme
+    setLoopState("saving");
+    setStatusMessage("Saving decision and advancing...");
+    processedCountRef.current += 1;
+    setBatchProcessed(processedCountRef.current);
+
+    let nextMeme: CurateMemeItem | null = null;
+    try {
+      nextMeme = await onAdvance();
+    } catch (saveErr) {
+      console.error("Auto advance save error:", saveErr);
+    }
+
+    if (!isRunningRef.current) return;
+
+    // 4. Continuously advance to next meme
+    if (nextMeme && nextMeme.id !== meme.id) {
+      processMeme(nextMeme);
+    } else {
+      stop("Queue finished or no more unreviewed memes in this queue.");
     }
   }, [onApplyDecision, onAdvance, clearTimers, stop]);
 
-  // When a new meme loads and AI loop is active, start judging it
+  // Handle manual "Next" navigation while AI Mode is running
   useEffect(() => {
     if (isRunning && currentMeme) {
-      // Check if we haven't already processed or aren't currently analyzing this meme
-      if (loopState === "idle" || loopState === "saving") {
-        judgeActiveMeme(currentMeme);
+      if (
+        inFlightMemeIdRef.current !== currentMeme.id &&
+        loopState !== "analyzing" &&
+        loopState !== "previewing" &&
+        loopState !== "saving"
+      ) {
+        processMeme(currentMeme);
       }
     }
-  }, [isRunning, currentMeme, loopState, judgeActiveMeme]);
+  }, [isRunning, currentMeme, loopState, processMeme]);
 
   const start = useCallback(() => {
-    if (!config.apiKey && config.provider !== "custom") {
+    if (!configRef.current.apiKey && configRef.current.provider !== "custom") {
       setErrorMessage("Please configure an API Key before starting AI Mode.");
       setLoopState("error");
       return;
@@ -160,10 +183,10 @@ export function useAiJudgeLoop({
     isRunningRef.current = true;
     setIsRunning(true);
     setErrorMessage(null);
-    processedMemeIdsRef.current.clear();
+    processedCountRef.current = 0;
     setBatchProcessed(0);
-    judgeActiveMeme(currentMemeRef.current);
-  }, [config, clearTimers, judgeActiveMeme]);
+    processMeme(currentMemeRef.current);
+  }, [clearTimers, processMeme]);
 
   // Cleanup on unmount
   useEffect(() => {

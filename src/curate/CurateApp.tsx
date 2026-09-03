@@ -143,8 +143,8 @@ export default function CurateApp() {
     img.src = url;
   };
 
-  const loadMeme = useCallback(async (currentId?: string, direction: "next" | "prev" = "next") => {
-    if (!token) return;
+  const loadMeme = useCallback(async (currentId?: string, direction: "next" | "prev" = "next"): Promise<CurateMemeItem | null> => {
+    if (!token) return null;
     try {
       setLoading(true);
       const res = await fetchNextMeme(filterQueue, currentId, direction);
@@ -170,8 +170,10 @@ export default function CurateApp() {
           setNote("");
         }
       }
+      return res.meme;
     } catch (err) {
       console.error("Error loading meme:", err);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -184,10 +186,11 @@ export default function CurateApp() {
   }, [token, viewMode, loadMeme]);
 
   // Save current decision and advance
-  const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus) => {
+  const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus): Promise<CurateMemeItem | null> => {
     const s = stateRef.current;
-    if (!s.currentMeme || s.isSaving) return;
+    if (!s.currentMeme || s.isSaving) return null;
     const activeStatus = forcedStatus || s.status || "keep";
+    const currentMemeId = s.currentMeme.id;
 
     setIsSaving(true);
     stateRef.current.isSaving = true;
@@ -206,7 +209,7 @@ export default function CurateApp() {
 
     try {
       await saveCuration({
-        meme_id: s.currentMeme.id,
+        meme_id: currentMemeId,
         corpus_status: activeStatus,
         duplicate_of: activeStatus === "duplicate" ? s.duplicateOf : null,
         topics: activeStatus === "keep" ? s.topics : [],
@@ -218,13 +221,13 @@ export default function CurateApp() {
       });
     } catch (err) {
       console.error("Failed to save curation decision:", err);
-    }
-
-    setTimeout(async () => {
+    } finally {
       setIsSaving(false);
       stateRef.current.isSaving = false;
-      await loadMeme(s.currentMeme?.id, "next");
-    }, 120);
+    }
+
+    const nextMeme = await loadMeme(currentMemeId, "next");
+    return nextMeme;
   }, [user, loadMeme]);
 
   // Topic Toggle (Max 3)
