@@ -13,6 +13,10 @@ import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
 import CurateLogin from "./CurateLogin";
 import CurateSuperDashboard from "./super/CurateSuperDashboard";
+import type { AiJudgeConfig, AiJudgeDecision } from "./ai-judge/aiJudgeTypes";
+import { DEFAULT_AI_JUDGE_CONFIG } from "./ai-judge/aiJudgeTypes";
+import AiJudgeConsole from "./ai-judge/AiJudgeConsole";
+import { useAiJudgeLoop } from "./ai-judge/useAiJudgeLoop";
 import "./curate.css";
 
 interface UndoHistoryItem {
@@ -65,6 +69,30 @@ export default function CurateApp() {
 
   const [undoStack, setUndoStack] = useState<UndoHistoryItem[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // AI Judge State & Hook
+  const [aiConfig, setAiConfig] = useState<AiJudgeConfig>(DEFAULT_AI_JUDGE_CONFIG);
+
+  const handleApplyAiDecision = useCallback((decision: AiJudgeDecision) => {
+    setStatus(decision.corpus_status);
+    setTopics(decision.topics);
+    setTone(decision.tone);
+    setMechanisms(decision.humour_mechanisms);
+    setDuplicateOf(decision.duplicate_of || "");
+    setNote(decision.curator_note);
+  }, []);
+
+  const aiLoop = useAiJudgeLoop({
+    currentMeme,
+    config: aiConfig,
+    onApplyDecision: handleApplyAiDecision,
+    onAdvance: () => handleSaveAndAdvance()
+  });
+
+  const aiLoopRef = useRef(aiLoop);
+  useEffect(() => {
+    aiLoopRef.current = aiLoop;
+  }, [aiLoop]);
 
   // Refs for zero-latency keyboard shortcut execution (prevents stale closure issues)
   const stateRef = useRef({
@@ -256,6 +284,13 @@ export default function CurateApp() {
       }
 
       const key = e.key.toLowerCase();
+
+      // Escape stops AI Mode if running
+      if (e.key === "Escape" && aiLoopRef.current.isRunning) {
+        e.preventDefault();
+        aiLoopRef.current.stop("Stopped via ESC key");
+        return;
+      }
 
       // 1. Layer 0 Editorial Shortcuts
       if (key === "k") {
@@ -476,6 +511,23 @@ export default function CurateApp() {
           <div className="curate-progress-fill" style={{ width: `${percentComplete}%` }} />
         </div>
       </header>
+
+      {/* AI Judge Continuous Console */}
+      <div style={{ padding: "0 24px", maxWidth: "1600px", width: "100%", margin: "16px auto 0 auto" }}>
+        <AiJudgeConsole
+          config={aiConfig}
+          onUpdateConfig={setAiConfig}
+          isRunning={aiLoop.isRunning}
+          loopState={aiLoop.loopState}
+          statusMessage={aiLoop.statusMessage}
+          previewProgress={aiLoop.previewProgress}
+          lastDecision={aiLoop.lastDecision}
+          errorMessage={aiLoop.errorMessage}
+          batchProcessed={aiLoop.batchProcessed}
+          onStart={aiLoop.start}
+          onStop={aiLoop.stop}
+        />
+      </div>
 
       {/* Main Curation Workspace */}
       <main className="curate-main-grid">

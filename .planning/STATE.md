@@ -44,6 +44,7 @@ Backend (Phase 2 — COMPLETE):
 - `.dev.vars` configured with `ADMIN_API_TOKEN` and `R2_PUBLIC_URL`.
 - Old `functions/_shared/supabase.ts` is still present as an unused archive file (no active imports).
 - Admin dashboard enhanced with Backend/Local mode badges, active meme count, and R2_PUBLIC_URL warnings.
+- Continuous AI Judging Mode in `/curate`: Vision model + structured output integration (`AiJudgeConsole.tsx`, `useAiJudgeLoop.ts`, `ai-proxy.ts`) supporting NVIDIA NIM, OpenRouter, Google AI Studio, Groq, and custom OpenAI-compatible vision APIs.
 
 Git: Connected to `https://github.com/editorav010-dev/Meme-Capsule` on branch `main`.
 
