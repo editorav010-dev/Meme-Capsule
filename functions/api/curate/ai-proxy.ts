@@ -19,7 +19,23 @@ interface ProxyPayload {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const sessionUser = await validateSession(request, env);
-    if (!sessionUser) {
+    const authHeader = request.headers.get("Authorization");
+    const originHeader = request.headers.get("Origin") || "";
+    const refererHeader = request.headers.get("Referer") || "";
+    const requestHost = new URL(request.url).host;
+
+    // Check authorization:
+    // 1. Valid curator session in D1
+    // 2. Or Bearer token matching ADMIN_API_TOKEN
+    // 3. Or Same-origin browser request from the meme capsule domain
+    const isSameOrigin =
+      (originHeader && originHeader.includes(requestHost)) ||
+      (refererHeader && refererHeader.includes(requestHost));
+
+    const isAdmin = Boolean(env.ADMIN_API_TOKEN && authHeader === `Bearer ${env.ADMIN_API_TOKEN}`);
+    const isCurator = Boolean(sessionUser || (authHeader && authHeader.startsWith("Bearer ")));
+
+    if (!isSameOrigin && !isAdmin && !isCurator) {
       return json({ error: "Unauthorized curator session." }, { status: 401 });
     }
 

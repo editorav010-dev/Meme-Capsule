@@ -36,11 +36,17 @@ const postCompletion = async (
   const endpoint = `${normalizedBase}/chat/completions`;
 
   if (config.useProxy) {
+    const token = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("curator_token") : null;
+    const proxyHeaders: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (token) {
+      proxyHeaders["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch("/api/curate/ai-proxy", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: proxyHeaders,
       body: JSON.stringify({
         endpoint,
         apiKey: config.apiKey,
