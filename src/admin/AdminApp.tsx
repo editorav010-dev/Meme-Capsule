@@ -32,6 +32,7 @@ import {
 import type { MemeInputMethod, MemeStatus, Rarity } from "../types";
 import AnalyticsDashboard from "./analytics-dashboard/AnalyticsDashboard";
 import SqlRunner from "./sql-runner/SqlRunner";
+import AiTab from "./ai/AiTab";
 import "./admin.css";
 
 type FormState = Omit<AdminMeme, "tags"> & {
@@ -123,7 +124,7 @@ export default function AdminApp() {
   const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
   const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeTab, setActiveTab] = useState<"vault" | "analytics" | "sql">("vault");
+  const [activeTab, setActiveTab] = useState<"vault" | "analytics" | "sql" | "ai">("vault");
 
   // Filtering & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -502,6 +503,10 @@ export default function AdminApp() {
               <span className="material-symbols-outlined">terminal</span>
               SQL Playground
             </li>
+            <li className={activeTab === "ai" ? "active" : ""} onClick={() => setActiveTab("ai")}>
+              <span className="material-symbols-outlined">psychology</span>
+              AI Categorisation
+            </li>
             <li onClick={useLocalMode}>
               <span className="material-symbols-outlined">inventory_2</span>
               Use Local Drafts
@@ -586,6 +591,13 @@ export default function AdminApp() {
               className="brutalist-border brutalist-shadow-black"
             >
               <SqlRunner adminToken={adminToken} />
+            </div>
+          ) : activeTab === "ai" ? (
+            <div
+              style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}
+              className="brutalist-border brutalist-shadow-black"
+            >
+              <AiTab adminToken={adminToken} />
             </div>
           ) : (
             <div className="split-pane">
