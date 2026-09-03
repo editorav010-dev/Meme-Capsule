@@ -25,8 +25,9 @@ export default function CurateLogin({ onLoginSuccess }: CurateLoginProps) {
     try {
       const res = await catLogin(username.trim(), password);
       onLoginSuccess(res.token, res.user);
-    } catch {
-      setError("INVALID CREDENTIALS — TRY AGAIN");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "INVALID CREDENTIALS — TRY AGAIN";
+      setError(msg.toUpperCase());
     } finally {
       setLoading(false);
     }
