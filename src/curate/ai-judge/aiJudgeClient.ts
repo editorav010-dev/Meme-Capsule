@@ -5,15 +5,26 @@ import {
   CURATION_MECHANISMS
 } from "../curateTypes";
 import type { AiJudgeConfig, AiJudgeDecision } from "./aiJudgeTypes";
-import { buildAiJudgeSystemPrompt, buildAiJudgeUserPrompt } from "./aiJudgePrompt";
+import {
+  buildAiJudgeSystemPrompt,
+  buildAiJudgeUserPrompt,
+  buildUnifiedAiJudgePrompt
+} from "./aiJudgePrompt";
 
 const VALID_STATUSES = new Set(["keep", "excluded", "duplicate", "review_later"]);
 const VALID_TOPICS = new Set(CURATION_TOPICS.map((t) => t.id));
 const VALID_TONES = new Set(CURATION_TONES.map((t) => t.id));
 const VALID_MECHS = new Set(CURATION_MECHANISMS.map((m) => m.id));
 
-const stripJsonMarkdown = (raw: string): string => {
-  let cleaned = raw.trim();
+/**
+ * Robust JSON extractor that finds and parses the outermost JSON object
+ * from any model output, handling conversational wrappers, markdown fences,
+ * and conversational preambles.
+ */
+export const extractJsonFromText = (text: string): any => {
+  let cleaned = text.trim();
+
+  // Strip standard markdown fences if present
   if (cleaned.startsWith("```json")) {
     cleaned = cleaned.slice(7);
   } else if (cleaned.startsWith("```")) {
@@ -22,13 +33,26 @@ const stripJsonMarkdown = (raw: string): string => {
   if (cleaned.endsWith("```")) {
     cleaned = cleaned.slice(0, -3);
   }
-  return cleaned.trim();
+  cleaned = cleaned.trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Search for outermost JSON object boundaries { ... }
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = cleaned.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(candidate);
+    }
+    throw new Error(`Model output did not contain valid JSON: "${cleaned.slice(0, 120)}..."`);
+  }
 };
 
 /**
  * Execute a completion call either directly or via the Cloudflare CORS proxy.
  */
-const postCompletion = async (
+export const postCompletion = async (
   config: AiJudgeConfig,
   body: Record<string, unknown>
 ): Promise<any> => {
@@ -96,7 +120,7 @@ export const testAiConnection = async (config: AiJudgeConfig): Promise<{ success
       messages: [
         { role: "user", content: "Respond with the single word 'OK'." }
       ],
-      max_tokens: 10
+      max_tokens: 15
     };
 
     const data = await postCompletion(config, payload);
@@ -114,7 +138,12 @@ export const testAiConnection = async (config: AiJudgeConfig): Promise<{ success
 };
 
 /**
- * Analyze a meme using the configured vision model and return a sanitized decision.
+ * Universal Vision Model Analysis with Adaptive Fallback:
+ * 1. Tries standard structured output mode.
+ * 2. If rejected due to response_format or system message restrictions,
+ *    automatically retries with adaptive fallback without response_format
+ *    and with merged prompt.
+ * 3. Uses outermost JSON extraction to reliably parse conversational model outputs.
  */
 export const analyzeMemeWithAi = async (
   meme: CurateMemeItem,
@@ -122,7 +151,7 @@ export const analyzeMemeWithAi = async (
 ): Promise<AiJudgeDecision> => {
   const startTime = Date.now();
 
-  const payload: Record<string, unknown> = {
+  const standardPayload: Record<string, unknown> = {
     model: config.model,
     messages: [
       {
@@ -146,24 +175,91 @@ export const analyzeMemeWithAi = async (
       }
     ],
     temperature: 0.1,
-    max_tokens: 800
+    max_tokens: 800,
+    response_format: { type: "json_object" }
   };
 
-  // Enable JSON object response mode where supported
-  payload["response_format"] = { type: "json_object" };
+  let data: any;
+  try {
+    // Attempt 1: Standard structured request
+    data = await postCompletion(config, standardPayload);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message.toLowerCase() : "";
 
-  const data = await postCompletion(config, payload);
-  const latencyMs = Date.now() - startTime;
+    // Check if error is related to response_format, unsupported parameters, or system roles
+    const isFormatError =
+      errMsg.includes("response_format") ||
+      errMsg.includes("json_object") ||
+      errMsg.includes("schema") ||
+      errMsg.includes("unexpected") ||
+      errMsg.includes("extra inputs") ||
+      errMsg.includes("not supported");
+    const isSystemError = errMsg.includes("system") || errMsg.includes("role");
 
-  const rawContent = data?.choices?.[0]?.message?.content;
-  if (!rawContent || typeof rawContent !== "string") {
-    throw new Error("Model returned empty or invalid content.");
+    if (isFormatError || isSystemError) {
+      // Attempt 2: Universal Adaptive Fallback (No response_format, merged prompt if needed)
+      const fallbackPayload: Record<string, unknown> = {
+        model: config.model,
+        messages: isSystemError
+          ? [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: buildUnifiedAiJudgePrompt(meme.title, meme.id)
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: meme.image_url
+                    }
+                  }
+                ]
+              }
+            ]
+          : [
+              {
+                role: "system",
+                content: buildAiJudgeSystemPrompt()
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: buildAiJudgeUserPrompt(meme.title, meme.id)
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: meme.image_url
+                    }
+                  }
+                ]
+              }
+            ],
+        temperature: 0.1,
+        max_tokens: 800
+      };
+
+      data = await postCompletion(config, fallbackPayload);
+    } else {
+      throw err;
+    }
   }
 
+  const latencyMs = Date.now() - startTime;
+  const rawContent = data?.choices?.[0]?.message?.content;
+  if (!rawContent || typeof rawContent !== "string") {
+    throw new Error("Model returned empty or invalid response content.");
+  }
+
+  // Parse JSON with robust outermost extractor
   let parsed: any;
   try {
-    parsed = JSON.parse(stripJsonMarkdown(rawContent));
-  } catch {
+    parsed = extractJsonFromText(rawContent);
+  } catch (parseErr) {
     throw new Error(`Failed to parse AI output as JSON: ${rawContent.slice(0, 100)}...`);
   }
 
@@ -193,14 +289,17 @@ export const analyzeMemeWithAi = async (
     .filter((m: string) => VALID_MECHS.has(m as any))
     .slice(0, 2);
 
-  const confidence = typeof parsed.confidence === "number" ? Math.min(1, Math.max(0, parsed.confidence)) : 0.85;
+  const confidence =
+    typeof parsed.confidence === "number" ? Math.min(1, Math.max(0, parsed.confidence)) : 0.85;
 
   // Apply low-confidence fallback if score is below threshold
   if (confidence < config.confidenceThreshold) {
     corpusStatus = config.lowConfidenceFallback;
   }
 
-  const curatorNote = parsed.curator_note ? String(parsed.curator_note).trim() : "Automated AI curation";
+  const curatorNote = parsed.curator_note
+    ? String(parsed.curator_note).trim()
+    : "Automated AI curation";
 
   return {
     corpus_status: corpusStatus as any,

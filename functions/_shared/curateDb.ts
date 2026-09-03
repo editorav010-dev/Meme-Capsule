@@ -75,11 +75,27 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
         FOREIGN KEY (meme_id) REFERENCES memes(id)
       );
 
-      -- 6. Indexes
+      -- 6. Judge AI Presets Table (Isolated per judge)
+      CREATE TABLE IF NOT EXISTS cat_judge_ai_presets (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL,
+        preset_name TEXT NOT NULL,
+        provider    TEXT NOT NULL,
+        base_url    TEXT NOT NULL,
+        api_key     TEXT NOT NULL,
+        model       TEXT NOT NULL,
+        settings    TEXT NOT NULL DEFAULT '{}',
+        created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (user_id) REFERENCES cat_users(id) ON DELETE CASCADE
+      );
+
+      -- 7. Indexes
       CREATE INDEX IF NOT EXISTS idx_curation_meme_id ON meme_curation(meme_id);
       CREATE INDEX IF NOT EXISTS idx_curation_user_id ON meme_curation(user_id);
       CREATE INDEX IF NOT EXISTS idx_curation_status ON meme_curation(corpus_status);
       CREATE INDEX IF NOT EXISTS idx_curation_final_status ON meme_curation_final(corpus_status);
+      CREATE INDEX IF NOT EXISTS idx_judge_ai_presets_user ON cat_judge_ai_presets(user_id);
     `);
     tablesInitialized = true;
   } catch (err) {

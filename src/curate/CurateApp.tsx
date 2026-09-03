@@ -13,6 +13,7 @@ import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
 import CurateLogin from "./CurateLogin";
 import CurateSuperDashboard from "./super/CurateSuperDashboard";
+import CurateAccountModal from "./CurateAccountModal";
 import type { AiJudgeConfig, AiJudgeDecision } from "./ai-judge/aiJudgeTypes";
 import { DEFAULT_AI_JUDGE_CONFIG } from "./ai-judge/aiJudgeTypes";
 import AiJudgeConsole from "./ai-judge/AiJudgeConsole";
@@ -58,6 +59,7 @@ export default function CurateApp() {
   const [filterQueue, setFilterQueue] = useState<string>("unreviewed");
   const [stats, setStats] = useState({ total: 4485, reviewed: 0, remaining: 4485, current_index: 1 });
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
+  const [showAccountModal, setShowAccountModal] = useState<boolean>(false);
 
   // Form State for current meme
   const [status, setStatus] = useState<CorpusStatus | null>(null);
@@ -489,9 +491,27 @@ export default function CurateApp() {
             </button>
           )}
 
-          <span style={{ fontSize: "12px", color: "#ddd" }}>
-            Curator: <strong style={{ color: "#f4c300" }}>{user.display_name}</strong>
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowAccountModal(true)}
+            style={{
+              background: "#262626",
+              border: "1px solid #9b30ff",
+              color: "#f4c300",
+              padding: "4px 10px",
+              fontFamily: "Oswald",
+              fontSize: "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+            title="Manage your username, display name, and password"
+          >
+            <span>👤 {user.display_name}</span>
+            <span style={{ fontSize: "10px", color: "#aaa", fontFamily: "monospace" }}>({user.username})</span>
+            <span style={{ fontSize: "10px", color: "#9b30ff" }}>⚙️</span>
+          </button>
           <button
             type="button"
             onClick={handleLogout}
@@ -518,6 +538,7 @@ export default function CurateApp() {
       {/* AI Judge Continuous Console */}
       <div style={{ padding: "0 24px", maxWidth: "1600px", width: "100%", margin: "16px auto 0 auto" }}>
         <AiJudgeConsole
+          userId={user?.id}
           config={aiConfig}
           onUpdateConfig={setAiConfig}
           isRunning={aiLoop.isRunning}
@@ -668,6 +689,18 @@ export default function CurateApp() {
 
       {/* Stats & Export Modal */}
       {showStatsModal && <CurationStatsModal onClose={() => setShowStatsModal(false)} />}
+
+      {/* Account Settings Modal */}
+      {showAccountModal && user && (
+        <CurateAccountModal
+          user={user}
+          onClose={() => setShowAccountModal(false)}
+          onAccountUpdated={(updated) => {
+            setUser(updated);
+            sessionStorage.setItem("curator_user", JSON.stringify(updated));
+          }}
+        />
+      )}
     </div>
   );
 }
