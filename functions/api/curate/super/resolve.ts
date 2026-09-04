@@ -1,134 +1,393 @@
 /**
- * POST /api/curate/super/resolve
+ * POST /api/admin/ai-categorise
  *
- * Sets the final authoritative curation decision for a meme by Super Admin.
+ * AI pre-judge endpoint for Meme Capsule.
+ *
+ * IMPORTANT:
+ * - This endpoint NEVER writes to meme_curation.
+ * - This endpoint NEVER writes to meme_curation_final.
+ * - It stores AI predictions separately in ai_curation_predictions.
+ * - meme_id is optional because R2 filenames do not necessarily equal
+ *   D1 meme IDs. When storage_path is supplied, the endpoint resolves
+ *   the real memes.id from D1.
+ *
+ * Expected authorization:
+ *   Authorization: Bearer <ADMIN_API_TOKEN>
  */
 
-import type { PagesFunction } from "../../../_shared/pages";
-import { json, type Env } from "../../../_shared/d1r2";
-import { validateSession } from "../../../_shared/catAuth";
-import { ensureCurationTables } from "../../../_shared/curateDb";
+import type { PagesFunction } from "../../_shared/pages";
+import { json, type Env } from "../../_shared/d1r2";
 
-interface ResolvePayload {
+const TOPICS = [
+  "Everyday Life",
+  "Work / Education",
+  "Relationships",
+  "Family",
+  "Politics / Society",
+  "Internet Culture",
+  "Pop Culture",
+  "Gaming",
+  "Animals",
+  "Food",
+  "Technology",
+  "Other",
+] as const;
+
+const TONES = [
+  "Wholesome",
+  "Dark",
+  "Chaotic",
+  "Cynical",
+  "Awkward",
+  "Neutral",
+] as const;
+
+const MECHANISMS = [
+  "Relatability",
+  "Absurdity",
+  "Irony",
+  "Satire",
+  "Exaggeration",
+  "Cringe",
+  "Dark Humour",
+  "Parody",
+  "Surrealism",
+] as const;
+
+interface AICategorisePayload {
   meme_id?: string;
-  corpus_status?: "keep" | "excluded" | "duplicate" | "review_later";
-  duplicate_of?: string;
-  topics?: string[];
-  tone?: string;
-  humour_mechanisms?: string[];
-  curator_note?: string;
+  storage_path?: string;
+  image_url?: string;
+
+  topics?: unknown;
+  tone?: unknown;
+  humour_mechanisms?: unknown;
+
+  confidence?: unknown;
+  reasoning?: unknown;
+  model?: unknown;
+  tokens_used?: unknown;
+  processing_ms?: unknown;
+  raw_response?: unknown;
+  error?: unknown;
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+type PredictionRow = {
+  meme_id: string;
+  storage_path: string | null;
+  image_url: string | null;
+};
+
+function normalizeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeChoice(
+  value: unknown,
+  allowed: readonly string[],
+): string | null {
+  const input = normalizeString(value).toLowerCase();
+
+  if (!input) return null;
+
+  return (
+    allowed.find(
+      (item) => item.toLowerCase() === input,
+    ) || null
+  );
+}
+
+function normalizeList(
+  value: unknown,
+  allowed: readonly string[],
+  max: number,
+): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const result: string[] = [];
+
+  for (const item of value) {
+    const normalized = normalizeChoice(item, allowed);
+
+    if (normalized && !result.includes(normalized)) {
+      result.push(normalized);
+    }
+
+    if (result.length >= max) break;
+  }
+
+  return result;
+}
+
+function toNumber(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function ensureAIPredictionTable(db: D1Database) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS ai_curation_predictions (
+      meme_id           TEXT PRIMARY KEY,
+      storage_path      TEXT,
+      image_url         TEXT,
+      topics            TEXT NOT NULL DEFAULT '[]',
+      tone              TEXT,
+      humour_mechanisms TEXT NOT NULL DEFAULT '[]',
+      confidence        REAL NOT NULL DEFAULT 0,
+      reasoning         TEXT,
+      model             TEXT,
+      tokens_used       INTEGER NOT NULL DEFAULT 0,
+      processing_ms     INTEGER NOT NULL DEFAULT 0,
+      raw_response      TEXT,
+      error             TEXT,
+      created_at        TEXT NOT NULL DEFAULT (
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ),
+      updated_at        TEXT NOT NULL DEFAULT (
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      ),
+      FOREIGN KEY (meme_id) REFERENCES memes(id)
+    )
+  `).run();
+}
+
+async function resolveMeme(
+  db: D1Database,
+  body: AICategorisePayload,
+): Promise<PredictionRow | null> {
+  const memeId = normalizeString(body.meme_id);
+  const storagePath = normalizeString(body.storage_path);
+  const imageUrl = normalizeString(body.image_url);
+
+  // 1. If a real D1 meme_id is supplied, use it.
+  if (memeId) {
+    const row = await db.prepare(`
+      SELECT id AS meme_id, storage_path, image_url
+      FROM memes
+      WHERE id = ?
+      LIMIT 1
+    `).bind(memeId).first<PredictionRow>();
+
+    return row || null;
+  }
+
+  // 2. Preferred fallback: R2 object key == memes.storage_path.
+  if (storagePath) {
+    const row = await db.prepare(`
+      SELECT id AS meme_id, storage_path, image_url
+      FROM memes
+      WHERE storage_path = ?
+      LIMIT 1
+    `).bind(storagePath).first<PredictionRow>();
+
+    if (row) return row;
+  }
+
+  // 3. Last fallback: exact image URL.
+  if (imageUrl) {
+    const row = await db.prepare(`
+      SELECT id AS meme_id, storage_path, image_url
+      FROM memes
+      WHERE image_url = ?
+      LIMIT 1
+    `).bind(imageUrl).first<PredictionRow>();
+
+    if (row) return row;
+  }
+
+  return null;
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({
+  request,
+  env,
+}) => {
   try {
-    await ensureCurationTables(env.DB);
+    const authHeader = request.headers.get("Authorization");
 
-    const sessionUser = await validateSession(request, env);
-    if (!sessionUser || sessionUser.role !== "superadmin") {
-      return json({ error: "Superadmin credentials required." }, { status: 401 });
-    }
-
-    const body = (await request.json().catch(() => ({}))) as ResolvePayload;
-    const memeId = (body.meme_id || "").trim();
-    const corpusStatus = body.corpus_status;
-
-    if (!memeId) {
-      return json({ error: "meme_id is required." }, { status: 400 });
-    }
+    const adminToken = (env as Env & {
+      ADMIN_API_TOKEN?: string;
+    }).ADMIN_API_TOKEN;
 
     if (
-      !corpusStatus ||
-      !["keep", "excluded", "duplicate", "review_later"].includes(corpusStatus)
+      !adminToken ||
+      !authHeader ||
+      authHeader !== `Bearer ${adminToken}`
     ) {
       return json(
+        { error: "Unauthorised" },
+        { status: 401 },
+      );
+    }
+
+    const body = (await request.json().catch(() => ({}))) as AICategorisePayload;
+
+    // Ensure the AI-only table exists. This makes deployment simpler:
+    // no separate migration is required for the first rollout.
+    await ensureAIPredictionTable(env.DB);
+
+    const hasIdentity =
+      normalizeString(body.meme_id) ||
+      normalizeString(body.storage_path) ||
+      normalizeString(body.image_url);
+
+    if (!hasIdentity) {
+      return json(
         {
-          error:
-            "corpus_status must be 'keep', 'excluded', 'duplicate', or 'review_later'.",
+          error: "meme_id, storage_path or image_url required",
         },
         { status: 400 },
       );
     }
 
-    const rawTopics = Array.isArray(body.topics)
-      ? body.topics.filter(Boolean)
-      : [];
-    const topics = rawTopics.slice(0, 3);
+    const meme = await resolveMeme(env.DB, body);
 
-    const tone = (body.tone || "").trim() || null;
+    if (!meme) {
+      return json(
+        {
+          error: "Meme not found",
+          meme_id: normalizeString(body.meme_id) || null,
+          storage_path: normalizeString(body.storage_path) || null,
+          image_url: normalizeString(body.image_url) || null,
+        },
+        { status: 404 },
+      );
+    }
 
-    const rawMechanisms = Array.isArray(body.humour_mechanisms)
-      ? body.humour_mechanisms.filter(Boolean)
-      : [];
-    const mechanisms = rawMechanisms.slice(0, 2);
+    const topics = normalizeList(body.topics, TOPICS, 3);
+    const tone = normalizeChoice(body.tone, TONES);
+    const mechanisms = normalizeList(
+      body.humour_mechanisms,
+      MECHANISMS,
+      2,
+    );
 
-    const duplicateOf = (body.duplicate_of || "").trim() || null;
-    const curatorNote = (body.curator_note || "").trim() || null;
+    if (topics.length < 1) {
+      return json(
+        { error: "At least one valid topic is required." },
+        { status: 400 },
+      );
+    }
+
+    if (!tone) {
+      return json(
+        { error: "A valid tone is required." },
+        { status: 400 },
+      );
+    }
+
+    if (mechanisms.length < 1) {
+      return json(
+        {
+          error:
+            "At least one valid humour mechanism is required.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const confidence = Math.max(
+      0,
+      Math.min(
+        1,
+        toNumber(body.confidence, 0),
+      ),
+    );
+
+    const reasoning = normalizeString(body.reasoning) || null;
+    const model = normalizeString(body.model) || null;
+
+    const tokensUsed = Math.max(
+      0,
+      Math.round(toNumber(body.tokens_used, 0)),
+    );
+
+    const processingMs = Math.max(
+      0,
+      Math.round(toNumber(body.processing_ms, 0)),
+    );
+
+    const rawResponse = normalizeString(body.raw_response) || null;
+    const error = normalizeString(body.error) || null;
+
     const now = new Date().toISOString();
 
-    // Upsert into meme_curation_final
     await env.DB.prepare(`
-      INSERT INTO meme_curation_final (
+      INSERT INTO ai_curation_predictions (
         meme_id,
-        corpus_status,
-        duplicate_of,
+        storage_path,
+        image_url,
         topics,
         tone,
         humour_mechanisms,
-        curator_note,
-        resolved_by,
-        resolved_at,
+        confidence,
+        reasoning,
+        model,
+        tokens_used,
+        processing_ms,
+        raw_response,
+        error,
+        created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(meme_id) DO UPDATE SET
-        corpus_status = excluded.corpus_status,
-        duplicate_of = excluded.duplicate_of,
+        storage_path = excluded.storage_path,
+        image_url = excluded.image_url,
         topics = excluded.topics,
         tone = excluded.tone,
         humour_mechanisms = excluded.humour_mechanisms,
-        curator_note = excluded.curator_note,
-        resolved_by = excluded.resolved_by,
-        resolved_at = excluded.resolved_at,
+        confidence = excluded.confidence,
+        reasoning = excluded.reasoning,
+        model = excluded.model,
+        tokens_used = excluded.tokens_used,
+        processing_ms = excluded.processing_ms,
+        raw_response = excluded.raw_response,
+        error = excluded.error,
         updated_at = excluded.updated_at
-    `)
-      .bind(
-        memeId,
-        corpusStatus,
-        duplicateOf,
-        JSON.stringify(topics),
-        tone,
-        JSON.stringify(mechanisms),
-        curatorNote,
-        sessionUser.display_name || "Super Admin",
-        now,
-        now,
-      )
-      .run();
-
-    // Update active state in memes table
-    const isActive = corpusStatus === "keep" ? 1 : 0;
-
-    await env.DB.prepare(
-      "UPDATE memes SET is_active = ? WHERE id = ?",
-    )
-      .bind(isActive, memeId)
-      .run();
+    `).bind(
+      meme.meme_id,
+      meme.storage_path || normalizeString(body.storage_path) || null,
+      meme.image_url || normalizeString(body.image_url) || null,
+      JSON.stringify(topics),
+      tone,
+      JSON.stringify(mechanisms),
+      confidence,
+      reasoning,
+      model,
+      tokensUsed,
+      processingMs,
+      rawResponse,
+      error,
+      now,
+      now,
+    ).run();
 
     return json({
       success: true,
-      meme_id: memeId,
-      corpus_status: corpusStatus,
+      meme_id: meme.meme_id,
+      storage_path:
+        meme.storage_path ||
+        normalizeString(body.storage_path) ||
+        null,
       topics,
       tone,
       humour_mechanisms: mechanisms,
-      resolved_by: sessionUser.display_name,
+      confidence,
+      model,
+      ai_only: true,
     });
   } catch (err: unknown) {
     if (err instanceof Response) return err;
 
-    const msg =
-      err instanceof Error ? err.message : "Error resolving meme";
+    const message =
+      err instanceof Error
+        ? err.message
+        : "AI categorisation failed";
 
-    return json({ error: msg }, { status: 500 });
+    return json(
+      { error: message },
+      { status: 500 },
+    );
   }
 };
