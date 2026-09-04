@@ -80,7 +80,11 @@ export const postCompletion = async (
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || `Proxy failed with HTTP ${res.status}`);
+      const errDetail =
+        typeof data.error === "string"
+          ? data.error
+          : data.error?.message || data.message || `Proxy failed with HTTP ${res.status}`;
+      throw new Error(errDetail);
     }
     return data;
   }
@@ -118,21 +122,32 @@ export const testAiConnection = async (config: AiJudgeConfig): Promise<{ success
     const payload = {
       model: config.model,
       messages: [
-        { role: "user", content: "Respond with the single word 'OK'." }
+        { role: "user", content: "Reply with the single word OK." }
       ],
-      max_tokens: 15
+      max_tokens: 150 // Reasoning models (Muse, Kimi) require adequate token budget for thinking tokens
     };
 
     const data = await postCompletion(config, payload);
-    const content = data?.choices?.[0]?.message?.content || "";
+    const choice = data?.choices?.[0];
+    const content = (
+      choice?.message?.content ||
+      choice?.message?.reasoning_content ||
+      choice?.text ||
+      ""
+    ).trim();
+
     if (content) {
       return { success: true, message: `Connected to ${config.model} successfully!` };
     }
     return { success: false, message: "Received empty response from model." };
   } catch (err: unknown) {
+    let msg = err instanceof Error ? err.message : "Connection failed.";
+    if (msg.includes("timed out") || msg.includes("aborted")) {
+      msg = `Model request timed out (${config.model.split("/").pop()}). Large (90B) or reasoning models can take 30+ seconds to respond on free/shared tiers. Please retry, or use a faster vision model like 11B or Phi-3.`;
+    }
     return {
       success: false,
-      message: err instanceof Error ? err.message : "Connection failed."
+      message: msg
     };
   }
 };
@@ -250,8 +265,15 @@ export const analyzeMemeWithAi = async (
   }
 
   const latencyMs = Date.now() - startTime;
-  const rawContent = data?.choices?.[0]?.message?.content;
-  if (!rawContent || typeof rawContent !== "string") {
+  const choice = data?.choices?.[0];
+  const rawContent = (
+    choice?.message?.content ||
+    choice?.message?.reasoning_content ||
+    choice?.text ||
+    ""
+  ).trim();
+
+  if (!rawContent) {
     throw new Error("Model returned empty or invalid response content.");
   }
 

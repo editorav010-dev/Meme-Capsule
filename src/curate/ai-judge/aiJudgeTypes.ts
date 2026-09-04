@@ -20,9 +20,10 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     defaultModel: "meta/llama-3.2-11b-vision-instruct",
     recommendedModels: [
       "meta/llama-3.2-11b-vision-instruct",
-      "meta/llama-3.2-90b-vision-instruct",
+      "microsoft/phi-3-vision-128k-instruct",
+      "meta/muse-glimmer-30b",
       "nvidia/neva-22b",
-      "microsoft/phi-3-vision-128k-instruct"
+      "meta/llama-3.2-90b-vision-instruct"
     ],
     description: "NVIDIA hosted inference. 1,000 free API credits upon signup at build.nvidia.com.",
     keyHelpUrl: "https://build.nvidia.com"
@@ -36,10 +37,9 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
       "google/gemini-2.0-flash-exp:free",
       "qwen/qwen-2.5-vl-72b-instruct:free",
       "meta-llama/llama-3.2-11b-vision-instruct:free",
-      "moonshotai/kimi-k3",
-      "muse/glimmer-30b"
+      "moonshotai/kimi-k3"
     ],
-    description: "Aggregator supporting Muse Glimmer 30B, Kimi K3, and hundreds of vision models.",
+    description: "Aggregator supporting free Gemini, Qwen-VL, Llama Vision, and Kimi K3.",
     keyHelpUrl: "https://openrouter.ai/keys"
   },
   {

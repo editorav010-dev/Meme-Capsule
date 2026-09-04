@@ -56,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000); // 45 second timeout for vision reasoning
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout for heavy vision reasoning models
 
     const downstreamRes = await fetch(endpoint, {
       method: "POST",
@@ -65,16 +65,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       signal: controller.signal
     }).catch((err) => {
       clearTimeout(timeout);
-      throw new Error(`Failed to connect to model endpoint: ${err.message}`);
+      const isAbort = err.name === "AbortError" || err.message?.includes("aborted");
+      const msg = isAbort
+        ? "Downstream model took longer than 60 seconds to respond and timed out."
+        : `Failed to connect to model endpoint: ${err.message}`;
+      throw new Error(msg);
     });
 
     clearTimeout(timeout);
 
-    const data = await downstreamRes.json().catch(() => ({
-      error: `Downstream API returned non-JSON response with status ${downstreamRes.status}`
-    }));
+    const data = await downstreamRes.json().catch(() => ({}));
 
-    return json(data, { status: downstreamRes.status });
+    if (!downstreamRes.ok) {
+      const errText =
+        typeof data.error === "string"
+          ? data.error
+          : data.error?.message || data.message || `Upstream API returned HTTP ${downstreamRes.status}`;
+      return json({ error: errText }, { status: downstreamRes.status });
+    }
+
+    return json(data, { status: 200 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Proxy request failed";
     return json({ error: message }, { status: 500 });
