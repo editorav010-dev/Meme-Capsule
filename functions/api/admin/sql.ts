@@ -29,20 +29,34 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
+    // Strip SQL comments and normalize CRLF line endings to prevent D1 multiline syntax errors
+    const cleanedQuery = query
+      .replace(/\r\n/g, "\n")
+      .replace(/--.*$/gm, "")
+      .trim();
+
     // Check if query contains multiple statements
-    const statements = query.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+    const statements = cleanedQuery
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    if (statements.length === 0) {
+      return json({ success: false, error: "Query cannot be empty after stripping comments." }, { status: 400 });
+    }
 
     if (statements.length > 1) {
-      const execResult = await env.DB.exec(query);
+      const batchStmts = statements.map((s) => env.DB.prepare(s));
+      const batchResults = await env.DB.batch(batchStmts);
       return json({
         success: true,
-        results: [{ status: `Executed ${execResult.count ?? statements.length} statements successfully.` }],
-        meta: { duration: execResult.duration }
+        results: [{ status: `Executed ${batchResults.length} statements successfully.` }],
+        meta: { duration: batchResults[0]?.meta?.duration }
       });
     }
 
     // Single statement: check if SELECT / read-only query
-    const single = statements[0] || query;
+    const single = statements[0];
     const upper = single.toUpperCase();
 
     if (upper.startsWith("SELECT") || upper.startsWith("PRAGMA") || upper.startsWith("EXPLAIN")) {
@@ -55,11 +69,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     // DDL or single modification (CREATE, INSERT, UPDATE, DELETE)
-    const execResult = await env.DB.exec(single);
+    const runResult = await env.DB.prepare(single).run();
     return json({
       success: true,
       results: [{ status: "Statement executed successfully." }],
-      meta: { duration: execResult.duration }
+      meta: { duration: runResult.meta?.duration }
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Database execution failed.";
