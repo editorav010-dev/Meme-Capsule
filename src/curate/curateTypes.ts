@@ -66,6 +66,18 @@ export interface CurateMemeItem {
   image_url: string;
   storage_path: string;
   curation?: CuratedMemeData | null;
+  ai_prediction?: {
+    topics: string[];
+    tone: string | null;
+    humour_mechanisms: string[];
+    confidence: number;
+    reasoning: string | null;
+    model: string | null;
+    tokens_used: number;
+    processing_ms: number;
+    error: string | null;
+    updated_at: string | null;
+  } | null;
 }
 
 export interface CurationCounts {
