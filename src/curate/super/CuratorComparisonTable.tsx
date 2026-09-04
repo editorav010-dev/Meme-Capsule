@@ -14,6 +14,37 @@ export default function CuratorComparisonTable({
   onRefresh
 }: CuratorComparisonTableProps) {
   const [selectedMeme, setSelectedMeme] = useState<SuperMemeItem | null>(null);
+  const validTopics = new Set([
+    "Everyday Life", "Work / Education", "Relationships", "Family",
+    "Politics / Society", "Internet Culture", "Pop Culture", "Gaming",
+    "Animals", "Food", "Technology", "Other"
+  ]);
+  const validTones = new Set(["Wholesome", "Dark", "Chaotic", "Cynical", "Awkward", "Neutral"]);
+  const validMechanisms = new Set([
+    "Relatability", "Absurdity", "Irony", "Satire", "Exaggeration",
+    "Cringe", "Dark Humour", "Parody", "Surrealism"
+  ]);
+
+  const getAiState = (ai: SuperMemeItem["ai_judge"]) => {
+    if (!ai) return "missing";
+    const validStatus = ["keep", "excluded", "duplicate", "review_later"].includes(ai.corpus_status || "");
+    const validTaxonomy =
+      ai.topics.length <= 3 &&
+      ai.topics.every((topic) => validTopics.has(topic)) &&
+      (ai.tone === null || validTones.has(ai.tone)) &&
+      ai.humour_mechanisms.length <= 2 &&
+      ai.humour_mechanisms.every((mechanism) => validMechanisms.has(mechanism));
+    return validStatus && validTaxonomy && !ai.error ? "valid" : "invalid";
+  };
+
+  const getStatusColor = (status: string | null) =>
+    status === "keep" ? "#34C759" : status === "excluded" ? "#FF3B30" : "#FF9F0A";
+
+  const getStatusLabel = (status: string | null) => {
+    if (status === "excluded") return "EXCLUDE";
+    if (status === "review_later") return "REVIEW_LATER";
+    return status ? status.toUpperCase() : "INVALID RESULT";
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -88,10 +119,12 @@ export default function CuratorComparisonTable({
 
                 {/* Judges Submissions */}
                 <td style={{ padding: "10px 14px" }}>
-                  {m.judges.length === 0 ? (
-                    <span style={{ color: "#666" }}>Pending judge reviews</span>
-                  ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {m.judges.length === 0 && (
+                      <span style={{ color: "#666" }}>Pending judge reviews</span>
+                    )}
+                    {m.judges.length > 0 && (
+                      <>
                       {m.judges.map((j) => (
                         <div
                           key={j.user_id}
@@ -106,7 +139,7 @@ export default function CuratorComparisonTable({
                             <strong style={{ color: "#f4c300" }}>{j.user_name}:</strong>
                             <span
                               style={{
-                                color: j.corpus_status === "keep" ? "#34C759" : j.corpus_status === "excluded" ? "#FF3B30" : "#FF9F0A",
+                                color: getStatusColor(j.corpus_status),
                                 fontWeight: "bold",
                                 textTransform: "uppercase"
                               }}
@@ -121,8 +154,49 @@ export default function CuratorComparisonTable({
                           )}
                         </div>
                       ))}
-                    </div>
-                  )}
+                      </>
+                    )}
+                      {(() => {
+                        const aiState = getAiState(m.ai_judge);
+                        if (aiState === "missing") {
+                          return (
+                            <div style={{ background: "#242424", border: "1px solid #383838", padding: "4px 8px", fontSize: "11px", color: "#777" }}>
+                              <strong style={{ color: "#9b7bb2" }}>AI Judge:</strong> NOT JUDGED
+                            </div>
+                          );
+                        }
+                        if (aiState === "invalid") {
+                          return (
+                            <div style={{ background: "#242424", border: "1px solid #8d741c", padding: "4px 8px", fontSize: "11px", color: "#FF9F0A" }}>
+                              <strong>AI Judge:</strong> INVALID RESULT
+                            </div>
+                          );
+                        }
+                        const ai = m.ai_judge!;
+                        return (
+                          <div style={{ background: "#242424", border: "1px solid #6f4b8f", padding: "4px 8px", fontSize: "11px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <strong style={{ color: "#c58cff" }}>AI Judge:</strong>
+                              <span style={{ color: getStatusColor(ai.corpus_status), fontWeight: "bold", textTransform: "uppercase" }}>
+                                {getStatusLabel(ai.corpus_status)}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: "10px", color: "#aaa" }}>
+                              {ai.topics.length ? ai.topics.join(", ") : "No topics"}
+                            </div>
+                            <div style={{ fontSize: "10px", color: "#888" }}>
+                              {ai.tone || "No tone"} · {ai.humour_mechanisms.length ? ai.humour_mechanisms.join(", ") : "No mechanisms"} · {ai.confidence === null ? "No confidence" : `${Math.round(Math.max(0, Math.min(1, ai.confidence)) * 100)}% confidence`}
+                            </div>
+                            {ai.reasoning && (
+                              <details style={{ marginTop: "4px", color: "#aaa", fontSize: "10px" }}>
+                                <summary style={{ cursor: "pointer", color: "#c58cff" }}>AI details</summary>
+                                <div style={{ marginTop: "3px" }}>{ai.reasoning}</div>
+                              </details>
+                            )}
+                          </div>
+                        );
+                      })()}
+                  </div>
                 </td>
 
                 {/* Final Decision */}

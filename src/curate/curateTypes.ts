@@ -67,6 +67,7 @@ export interface CurateMemeItem {
   storage_path: string;
   curation?: CuratedMemeData | null;
   ai_prediction?: {
+    corpus_status: CorpusStatus | null;
     topics: string[];
     tone: string | null;
     humour_mechanisms: string[];

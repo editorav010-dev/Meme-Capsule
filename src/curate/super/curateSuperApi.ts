@@ -40,6 +40,13 @@ export interface SuperSummaryResponse {
     review_later: number;
     last_active: string;
   }[];
+  ai_judge: {
+    total_reviewed: number;
+    kept: number;
+    excluded: number;
+    duplicates: number;
+    review_later: number;
+  };
 }
 
 export interface SuperMemeItem {
@@ -59,6 +66,17 @@ export interface SuperMemeItem {
     curator_note?: string | null;
     reviewed_at: string;
   }[];
+  ai_judge: {
+    corpus_status: "keep" | "excluded" | "duplicate" | "review_later" | null;
+    topics: string[];
+    tone: string | null;
+    humour_mechanisms: string[];
+    confidence: number | null;
+    reasoning: string | null;
+    model: string | null;
+    updated_at: string | null;
+    error: string | null;
+  } | null;
   final_decision?: {
     corpus_status: "keep" | "excluded" | "duplicate" | "review_later";
     duplicate_of?: string | null;

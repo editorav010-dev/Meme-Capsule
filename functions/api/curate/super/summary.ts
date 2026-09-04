@@ -7,7 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
-import { ensureCurationTables } from "../../../_shared/curateDb";
+import { ensureAIPredictionTable, ensureCurationTables } from "../../../_shared/curateDb";
 
 interface JudgeCountRow {
   user_id: string;
@@ -26,9 +26,18 @@ interface CurationRow {
   corpus_status: string;
 }
 
+interface AICountRow {
+  total_reviewed: number;
+  kept: number;
+  excluded: number;
+  duplicates: number;
+  review_later: number;
+}
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
+    await ensureAIPredictionTable(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
@@ -68,6 +77,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     `).all<JudgeCountRow>();
 
     const judges = judgeResults || [];
+
+    let aiJudge: AICountRow = {
+      total_reviewed: 0,
+      kept: 0,
+      excluded: 0,
+      duplicates: 0,
+      review_later: 0
+    };
+    try {
+      const aiResult = await env.DB.prepare(`
+        SELECT
+          COUNT(*) as total_reviewed,
+          COALESCE(SUM(CASE WHEN corpus_status = 'keep' THEN 1 ELSE 0 END), 0) as kept,
+          COALESCE(SUM(CASE WHEN corpus_status = 'excluded' THEN 1 ELSE 0 END), 0) as excluded,
+          COALESCE(SUM(CASE WHEN corpus_status = 'duplicate' THEN 1 ELSE 0 END), 0) as duplicates,
+          COALESCE(SUM(CASE WHEN corpus_status = 'review_later' THEN 1 ELSE 0 END), 0) as review_later
+        FROM ai_curation_predictions
+        WHERE corpus_status IS NOT NULL
+      `).first<AICountRow>();
+      if (aiResult) aiJudge = aiResult;
+    } catch {
+      // AI storage is optional; human progress must remain available.
+    }
 
     // 4. Consensus & disagreement analysis across multi-judge reviews
     const { results: allReviews } = await env.DB.prepare(`
@@ -120,7 +152,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         conflicts,
         total_with_reviews: reviewedMemeCount
       },
-      judges
+      judges,
+      ai_judge: aiJudge
     });
   } catch (err: unknown) {
     if (err instanceof Response) return err;
