@@ -52,7 +52,7 @@ human curation fields and is not the endpoint used for the active judge workspac
 ## AI storage
 
 The `/curate`-compatible AI storage shape is the dynamically ensured
-`ai_curation_predictions` table in `functions/api/curate/next.ts`. Its fields include:
+`ai_curation_predictions` table in `functions/_shared/curateDb.ts`. Its fields include:
 
 - `meme_id`
 - `topics`
@@ -83,9 +83,23 @@ Neither human table should receive AI records.
 
 ## Current gap
 
-The backend already returns `meme.ai_prediction`, but the frontend type
-`CurateMemeItem` does not declare it and `CurateApp.tsx` does not render it.
-Therefore the primary missing link is the frontend display layer and its type.
+The Super Admin endpoint is `GET /api/curate/super/memes`. It bulk-loads
+`ai_curation_predictions` for the visible meme IDs and returns each row as
+`ai_judge`, alongside the human `judges` array. The frontend renders that object
+inside the existing `JUDGES DECISIONS` column without adding it to `judges_count`
+or consensus calculations.
+
+The existing external write route,
+`POST /api/admin/ai-categorise`, previously accepted only legacy numeric
+`category_id` data. It now also accepts the `/curate` fields and upserts the
+validated result into `ai_curation_predictions`. This keeps the producer's
+existing endpoint and legacy response compatible while making new structured
+AI results available to both `/curate` and Super Admin.
+
+Existing legacy rows in `memes.ai_category` or `ai_cat_decisions` cannot be
+converted into the `/curate` taxonomy without inventing a mapping. They remain
+owned by the older `/categorise` system; only structured rows in
+`ai_curation_predictions` are displayed as the fourth AI Judge.
 
 The existing client-side AI console can generate a decision in React state and route
 it through the ordinary human save flow. That behavior is not suitable for an
@@ -93,17 +107,15 @@ advisory-only AI layer because it can write AI-populated values into `meme_curat
 The approved implementation must keep the persisted external AI result read-only in
 the human workspace and must not use AI data to update human decisions.
 
-## Required implementation
+## Display and separation rules
 
-1. Add a typed optional `ai_prediction` field to `CurateMemeItem`.
-2. Add a compact, visually secondary `AI PRE-JUDGE` panel to the existing `/curate`
-   workspace.
-3. Render topics, tone, humour mechanisms, confidence, reasoning, and model metadata
-   from the existing backend response.
-4. Render `Not analysed yet.` when no prediction exists.
-5. Keep the panel separate from `EditorialButtons`, `CategorizationPanel`, and
+1. The regular `/curate` workspace shows the advisory `AI PRE-JUDGE` panel.
+2. Super Admin shows the AI row only when a structured prediction exists; missing
+   predictions are omitted from the judge-card list.
+3. Render topics, tone, humour mechanisms, and confidence from the backend response.
+4. Keep AI data separate from `EditorialButtons`, `CategorizationPanel`, and
    `saveCuration()`.
-6. Do not write AI data to `meme_curation`, `meme_curation_final`, `cat_consensus`,
+5. Do not write AI data to `meme_curation`, `meme_curation_final`, `cat_consensus`,
    or `cat_decisions`.
 
 ## Database impact
