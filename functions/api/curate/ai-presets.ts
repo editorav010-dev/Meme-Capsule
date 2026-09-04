@@ -4,13 +4,15 @@
  * DELETE /api/curate/ai-presets?id=...
  *
  * Dedicated AI model presets endpoint isolated strictly per individual judge.
- * Guarantees that Judge A can never query, view, modify, or delete Judge B's presets or keys.
+ * API keys are automatically encrypted at rest using AES-GCM-256 before saving to D1.
+ * Guarantees that raw API keys are never visible in SQL queries or database dumps.
  */
 
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
 import { requireAuth } from "../../_shared/catAuth";
 import { ensureCurationTables } from "../../_shared/curateDb";
+import { encryptApiKey, decryptApiKey } from "../../_shared/crypto";
 
 interface SavePresetPayload {
   id?: string;
@@ -26,6 +28,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
     const sessionUser = await requireAuth(request, env);
+    const secretSeed = env.ADMIN_API_TOKEN || "meme-capsule-secret-token";
 
     const results = await env.DB.prepare(`
       SELECT id, preset_name, provider, base_url, api_key, model, settings, created_at, updated_at
@@ -34,18 +37,25 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       ORDER BY updated_at DESC
     `).bind(sessionUser.id).all();
 
-    const presets = (results.results || []).map((row: any) => {
-      let parsedSettings = {};
-      try {
-        parsedSettings = JSON.parse(row.settings || "{}");
-      } catch {
-        // ignore
-      }
-      return {
-        ...row,
-        settings: parsedSettings
-      };
-    });
+    const presets = await Promise.all(
+      (results.results || []).map(async (row: any) => {
+        let parsedSettings = {};
+        try {
+          parsedSettings = JSON.parse(row.settings || "{}");
+        } catch {
+          // ignore
+        }
+
+        // Decrypt AES-GCM-256 encrypted key for the authenticated judge
+        const decryptedKey = await decryptApiKey(row.api_key || "", secretSeed);
+
+        return {
+          ...row,
+          api_key: decryptedKey,
+          settings: parsedSettings
+        };
+      })
+    );
 
     return json({ success: true, presets });
   } catch (err: unknown) {
@@ -59,12 +69,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
     const sessionUser = await requireAuth(request, env);
+    const secretSeed = env.ADMIN_API_TOKEN || "meme-capsule-secret-token";
 
     const body = (await request.json().catch(() => ({}))) as SavePresetPayload;
     const presetName = (body.preset_name || "").trim();
     const provider = (body.provider || "custom").trim();
     const baseUrl = (body.base_url || "").trim();
-    const apiKey = (body.api_key || "").trim();
+    const rawApiKey = (body.api_key || "").trim();
     const model = (body.model || "").trim();
     const settingsStr = JSON.stringify(body.settings || {});
 
@@ -78,6 +89,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "Model identifier is required." }, { status: 400 });
     }
 
+    // Encrypt API key with AES-GCM-256 before persisting in D1
+    const storedApiKey = await encryptApiKey(rawApiKey, secretSeed);
     const now = new Date().toISOString();
 
     if (body.id) {
@@ -94,7 +107,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         UPDATE cat_judge_ai_presets
         SET preset_name = ?, provider = ?, base_url = ?, api_key = ?, model = ?, settings = ?, updated_at = ?
         WHERE id = ? AND user_id = ?
-      `).bind(presetName, provider, baseUrl, apiKey, model, settingsStr, now, body.id, sessionUser.id).run();
+      `).bind(presetName, provider, baseUrl, storedApiKey, model, settingsStr, now, body.id, sessionUser.id).run();
 
       return json({
         success: true,
@@ -104,7 +117,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           preset_name: presetName,
           provider,
           base_url: baseUrl,
-          api_key: apiKey,
+          api_key: rawApiKey,
           model,
           settings: body.settings || {},
           updated_at: now
@@ -112,14 +125,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       });
     }
 
-    // Insert new preset
+    // Insert new preset with encrypted key
     const newId = `preset-${crypto.randomUUID().slice(0, 8)}`;
     await env.DB.prepare(`
       INSERT INTO cat_judge_ai_presets (
         id, user_id, preset_name, provider, base_url, api_key, model, settings, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(newId, sessionUser.id, presetName, provider, baseUrl, apiKey, model, settingsStr, now, now).run();
+    `).bind(newId, sessionUser.id, presetName, provider, baseUrl, storedApiKey, model, settingsStr, now, now).run();
 
     return json({
       success: true,
@@ -129,7 +142,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         preset_name: presetName,
         provider,
         base_url: baseUrl,
-        api_key: apiKey,
+        api_key: rawApiKey,
         model,
         settings: body.settings || {},
         created_at: now,
