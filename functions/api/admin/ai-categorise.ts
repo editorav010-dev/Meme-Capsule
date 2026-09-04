@@ -34,6 +34,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     image_url = '',
     category_id = null,
     corpus_status = null,
+    decision = null,
     topics = [],
     tone = null,
     humour_mechanisms = [],
@@ -90,12 +91,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // curation. Legacy category fields below remain unchanged for compatibility.
   const hasStructuredResult =
     Object.prototype.hasOwnProperty.call(body, 'corpus_status') ||
+    Object.prototype.hasOwnProperty.call(body, 'decision') ||
     Object.prototype.hasOwnProperty.call(body, 'topics') ||
     Object.prototype.hasOwnProperty.call(body, 'tone') ||
     Object.prototype.hasOwnProperty.call(body, 'humour_mechanisms')
 
   if (hasStructuredResult) {
-    const normalizedStatus = String(corpus_status || '').toLowerCase()
+    const normalizedStatus = String(corpus_status || decision || '').trim().toLowerCase()
     const normalizedTopics = Array.isArray(topics)
       ? topics.filter((value: unknown): value is string => typeof value === 'string' && AI_TOPICS.has(value)).slice(0, 3)
       : []
