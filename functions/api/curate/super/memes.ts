@@ -166,6 +166,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       const fullUrl = m.image_url || (m.storage_path && publicBase ? `${publicBase}/${m.storage_path.replace(/^\/+/, "")}` : "") || "";
       const memeReviews = reviewsByMeme.get(m.id) || [];
       const ai = aiByMeme.get(m.id);
+      const aiStatus = ai?.corpus_status ? ai.corpus_status.trim().toLowerCase().replace("exclude", "excluded").replace("review later", "review_later").replace("later", "review_later") : null;
 
       // Determine consensus state
       let consensusStatus = "unreviewed";
@@ -230,7 +231,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         judges_count: memeReviews.length,
         judges: formattedReviews,
         ai_judge: ai ? {
-          corpus_status: ai.corpus_status,
+          corpus_status: aiStatus as AIPredictionRow["corpus_status"],
           topics: parseJsonArray(ai.topics),
           tone: ai.tone,
           humour_mechanisms: parseJsonArray(ai.humour_mechanisms),

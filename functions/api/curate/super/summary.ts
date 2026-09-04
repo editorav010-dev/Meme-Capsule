@@ -89,12 +89,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       const aiResult = await env.DB.prepare(`
         SELECT
           COUNT(*) as total_reviewed,
-          COALESCE(SUM(CASE WHEN corpus_status = 'keep' THEN 1 ELSE 0 END), 0) as kept,
-          COALESCE(SUM(CASE WHEN corpus_status = 'excluded' THEN 1 ELSE 0 END), 0) as excluded,
-          COALESCE(SUM(CASE WHEN corpus_status = 'duplicate' THEN 1 ELSE 0 END), 0) as duplicates,
-          COALESCE(SUM(CASE WHEN corpus_status = 'review_later' THEN 1 ELSE 0 END), 0) as review_later
+          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) = 'keep' THEN 1 ELSE 0 END), 0) as kept,
+          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) IN ('excluded', 'exclude') THEN 1 ELSE 0 END), 0) as excluded,
+          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) = 'duplicate' THEN 1 ELSE 0 END), 0) as duplicates,
+          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) IN ('review_later', 'review later', 'later') THEN 1 ELSE 0 END), 0) as review_later
         FROM ai_curation_predictions
-        WHERE corpus_status IS NOT NULL
+        WHERE lower(trim(corpus_status)) IN ('keep', 'excluded', 'exclude', 'duplicate', 'review_later', 'review later', 'later')
       `).first<AICountRow>();
       if (aiResult) aiJudge = aiResult;
     } catch {
