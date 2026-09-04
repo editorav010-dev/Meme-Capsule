@@ -181,11 +181,11 @@ export default function CurateSuperDashboard({
         )}
 
         {/* Judges Performance Strip */}
-        {summary && summary.judges.length > 0 && (
+        {summary && (summary.judges.length > 0 || summary.ai_judge.total_reviewed > 0) && (
           <div style={{ background: "#181818", border: "1px solid #333", padding: "16px", marginBottom: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
               <h3 className="curate-anton" style={{ margin: 0, fontSize: "16px", color: "#f4c300" }}>
-                CURATOR / JUDGES LIVE PROGRESS ({summary.judges.length} ACTIVE)
+                CURATOR / JUDGES LIVE PROGRESS ({summary.judges.length} ACTIVE + AI)
               </h3>
               <button
                 type="button"
@@ -213,6 +213,23 @@ export default function CurateSuperDashboard({
                   </div>
                 </div>
               ))}
+              <div style={{ background: "#222", border: "1px solid #6f4b8f", padding: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ color: "#c58cff", fontSize: "14px" }}>AI Judge</strong>
+                  <span style={{ fontSize: "12px", fontFamily: "monospace", color: "#f4c300" }}>
+                    {summary.ai_judge.total_reviewed} judged
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "8px", fontSize: "11px", color: "#aaa" }}>
+                  <span style={{ color: "#34C759" }}>{summary.ai_judge.kept} Keep</span>
+                  <span>•</span>
+                  <span style={{ color: "#FF3B30" }}>{summary.ai_judge.excluded} Excl</span>
+                  <span>•</span>
+                  <span style={{ color: "#FF9F0A" }}>{summary.ai_judge.duplicates} Dup</span>
+                  <span>•</span>
+                  <span style={{ color: "#f4c300" }}>{summary.ai_judge.review_later} Later</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

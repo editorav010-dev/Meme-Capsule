@@ -15,7 +15,7 @@
 import type { PagesFunction } from "../../_shared/pages";
 import { json, type Env } from "../../_shared/d1r2";
 import { validateSession } from "../../_shared/catAuth";
-import { ensureCurationTables } from "../../_shared/curateDb";
+import { ensureAIPredictionTable, ensureCurationTables } from "../../_shared/curateDb";
 
 interface MemeRow {
   id: string;
@@ -35,6 +35,7 @@ interface MemeRow {
   updated_at: string | null;
 
   ai_topics: string | null;
+  ai_corpus_status: string | null;
   ai_tone: string | null;
   ai_humour_mechanisms: string | null;
   ai_confidence: number | null;
@@ -44,29 +45,6 @@ interface MemeRow {
   ai_processing_ms: number | null;
   ai_error: string | null;
   ai_updated_at: string | null;
-}
-
-async function ensureAIPredictionTable(db: D1Database) {
-  await db.prepare(`
-    CREATE TABLE IF NOT EXISTS ai_curation_predictions (
-      meme_id           TEXT PRIMARY KEY,
-      storage_path      TEXT,
-      image_url         TEXT,
-      topics            TEXT NOT NULL DEFAULT '[]',
-      tone              TEXT,
-      humour_mechanisms TEXT NOT NULL DEFAULT '[]',
-      confidence        REAL NOT NULL DEFAULT 0,
-      reasoning         TEXT,
-      model             TEXT,
-      tokens_used       INTEGER NOT NULL DEFAULT 0,
-      processing_ms     INTEGER NOT NULL DEFAULT 0,
-      raw_response      TEXT,
-      error             TEXT,
-      created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-      updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-      FOREIGN KEY (meme_id) REFERENCES memes(id)
-    )
-  `).run();
 }
 
 function parseJsonArray(value: string | null): string[] {
@@ -100,6 +78,7 @@ function buildCuration(row: MemeRow) {
 function buildAIPrediction(row: MemeRow) {
   // No AI result for this meme yet.
   if (
+    !row.ai_corpus_status &&
     !row.ai_topics &&
     !row.ai_tone &&
     !row.ai_humour_mechanisms &&
@@ -112,6 +91,7 @@ function buildAIPrediction(row: MemeRow) {
 
   return {
     topics: parseJsonArray(row.ai_topics),
+    corpus_status: row.ai_corpus_status,
     tone: row.ai_tone,
     humour_mechanisms: parseJsonArray(row.ai_humour_mechanisms),
     confidence: Number(row.ai_confidence ?? 0),
@@ -142,6 +122,7 @@ const SELECT_COLUMNS = `
   c.updated_at,
 
   ai.topics            AS ai_topics,
+  ai.corpus_status     AS ai_corpus_status,
   ai.tone              AS ai_tone,
   ai.humour_mechanisms AS ai_humour_mechanisms,
   ai.confidence        AS ai_confidence,

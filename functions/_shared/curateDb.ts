@@ -1,5 +1,3 @@
-import type { D1Database } from "./d1r2";
-
 let tablesInitialized = false;
 
 // SHA-256 of "changeme123"
@@ -100,5 +98,38 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
     tablesInitialized = true;
   } catch (err) {
     console.error("Warning: could not auto-initialize tables:", err);
+  }
+
+}
+
+export async function ensureAIPredictionTable(db: D1Database): Promise<void> {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS ai_curation_predictions (
+      meme_id           TEXT PRIMARY KEY,
+      storage_path      TEXT,
+      image_url         TEXT,
+      corpus_status     TEXT,
+      topics            TEXT NOT NULL DEFAULT '[]',
+      tone              TEXT,
+      humour_mechanisms TEXT NOT NULL DEFAULT '[]',
+      confidence        REAL NOT NULL DEFAULT 0,
+      reasoning         TEXT,
+      model             TEXT,
+      tokens_used       INTEGER NOT NULL DEFAULT 0,
+      processing_ms     INTEGER NOT NULL DEFAULT 0,
+      raw_response      TEXT,
+      error             TEXT,
+      created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (meme_id) REFERENCES memes(id)
+    )
+  `).run();
+
+  try {
+    await db.prepare("ALTER TABLE ai_curation_predictions ADD COLUMN corpus_status TEXT").run();
+  } catch (error) {
+    if (!(error instanceof Error) || !/duplicate column name|already exists/i.test(error.message)) {
+      throw error;
+    }
   }
 }

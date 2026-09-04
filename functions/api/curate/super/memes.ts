@@ -7,7 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
-import { ensureCurationTables } from "../../../_shared/curateDb";
+import { ensureAIPredictionTable, ensureCurationTables } from "../../../_shared/curateDb";
 
 interface MemeRow {
   id: string;
@@ -36,9 +36,33 @@ interface JudgeReviewRow {
   reviewed_at: string;
 }
 
+interface AIPredictionRow {
+  meme_id: string;
+  corpus_status: string | null;
+  topics: string | null;
+  tone: string | null;
+  humour_mechanisms: string | null;
+  confidence: number | null;
+  reasoning: string | null;
+  model: string | null;
+  updated_at: string | null;
+  error: string | null;
+}
+
+const parseJsonArray = (value: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
+    await ensureAIPredictionTable(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
@@ -117,6 +141,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       reviews = reviewResults || [];
     }
 
+    let aiPredictions: AIPredictionRow[] = [];
+    if (memeIds.length > 0) {
+      const placeholders = memeIds.map(() => "?").join(",");
+      const { results: aiResults } = await env.DB.prepare(`
+        SELECT meme_id, corpus_status, topics, tone, humour_mechanisms, confidence,
+               reasoning, model, updated_at, error
+        FROM ai_curation_predictions
+        WHERE meme_id IN (${placeholders})
+      `).bind(...memeIds).all<AIPredictionRow>();
+      aiPredictions = aiResults || [];
+    }
+
     const reviewsByMeme = new Map<string, JudgeReviewRow[]>();
     for (const r of reviews) {
       if (!reviewsByMeme.has(r.meme_id)) {
@@ -124,10 +160,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       }
       reviewsByMeme.get(r.meme_id)!.push(r);
     }
+    const aiByMeme = new Map(aiPredictions.map((prediction) => [prediction.meme_id, prediction]));
 
     const data = memes.map((m) => {
       const fullUrl = m.image_url || (m.storage_path && publicBase ? `${publicBase}/${m.storage_path.replace(/^\/+/, "")}` : "") || "";
       const memeReviews = reviewsByMeme.get(m.id) || [];
+      const ai = aiByMeme.get(m.id);
 
       // Determine consensus state
       let consensusStatus = "unreviewed";
@@ -191,6 +229,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         consensus_status: consensusStatus,
         judges_count: memeReviews.length,
         judges: formattedReviews,
+        ai_judge: ai ? {
+          corpus_status: ai.corpus_status,
+          topics: parseJsonArray(ai.topics),
+          tone: ai.tone,
+          humour_mechanisms: parseJsonArray(ai.humour_mechanisms),
+          confidence: ai.confidence === null ? null : Number(ai.confidence),
+          reasoning: ai.reasoning,
+          model: ai.model,
+          updated_at: ai.updated_at,
+          error: ai.error
+        } : null,
         final_decision: m.final_status ? {
           corpus_status: m.final_status,
           duplicate_of: m.final_duplicate_of,
