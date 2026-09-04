@@ -7,7 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
-import { ensureAIPredictionTable, ensureCurationTables } from "../../../_shared/curateDb";
+import { ensureCurationTables } from "../../../_shared/curateDb";
 
 interface MemeRow {
   id: string;
@@ -36,33 +36,55 @@ interface JudgeReviewRow {
   reviewed_at: string;
 }
 
-interface AIPredictionRow {
+interface AIDecisionRow {
+  id: string;
   meme_id: string;
-  corpus_status: string | null;
-  topics: string | null;
-  tone: string | null;
-  humour_mechanisms: string | null;
+  category_label: string | null;
   confidence: number | null;
+  raw_response: string | null;
   reasoning: string | null;
   model: string | null;
-  updated_at: string | null;
+  created_at: string;
   error: string | null;
 }
 
-const parseJsonArray = (value: string | null): string[] => {
-  if (!value) return [];
+const parseAIResult = (row: AIDecisionRow) => {
+  let payload: Record<string, unknown> = {};
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+    const parsed = row.raw_response ? JSON.parse(row.raw_response) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      payload = parsed as Record<string, unknown>;
+    }
   } catch {
-    return [];
+    payload = {};
   }
+  const rawStatus = payload.corpus_status ?? payload.decision ?? row.category_label;
+  const status = typeof rawStatus === "string" ? rawStatus.trim().toLowerCase() : "";
+  const corpusStatus = ({
+    keep: "keep", kept: "keep", exclude: "excluded", excluded: "excluded",
+    duplicate: "duplicate", duplicates: "duplicate", later: "review_later",
+    "review later": "review_later", review_later: "review_later"
+  } as Record<string, string>)[status] || null;
+  const arrayValue = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return {
+    corpus_status: corpusStatus,
+    topics: arrayValue(payload.topics),
+    tone: typeof payload.tone === "string" ? payload.tone : null,
+    humour_mechanisms: arrayValue(payload.humour_mechanisms),
+    confidence: typeof payload.confidence === "number"
+      ? (payload.confidence > 1 ? payload.confidence / 100 : payload.confidence)
+      : row.confidence,
+    reasoning: typeof payload.reasoning === "string" ? payload.reasoning : row.reasoning,
+    model: row.model,
+    updated_at: row.created_at,
+    error: row.error
+  };
 };
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
-    await ensureAIPredictionTable(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
@@ -141,16 +163,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       reviews = reviewResults || [];
     }
 
-    let aiPredictions: AIPredictionRow[] = [];
+    let aiDecisions: AIDecisionRow[] = [];
     if (memeIds.length > 0) {
       const placeholders = memeIds.map(() => "?").join(",");
       const { results: aiResults } = await env.DB.prepare(`
-        SELECT meme_id, corpus_status, topics, tone, humour_mechanisms, confidence,
-               reasoning, model, updated_at, error
-        FROM ai_curation_predictions
-        WHERE meme_id IN (${placeholders})
-      `).bind(...memeIds).all<AIPredictionRow>();
-      aiPredictions = aiResults || [];
+        SELECT id, meme_id, category_label, confidence, raw_response,
+               reasoning, model, created_at, error
+        FROM ai_cat_decisions
+        WHERE meme_id IN (${placeholders}) AND error IS NULL
+        ORDER BY created_at DESC, id DESC
+      `).bind(...memeIds).all<AIDecisionRow>();
+      aiDecisions = aiResults || [];
     }
 
     const reviewsByMeme = new Map<string, JudgeReviewRow[]>();
@@ -160,13 +183,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       }
       reviewsByMeme.get(r.meme_id)!.push(r);
     }
-    const aiByMeme = new Map(aiPredictions.map((prediction) => [prediction.meme_id, prediction]));
+    const aiByMeme = new Map<string, ReturnType<typeof parseAIResult>>();
+    for (const decision of aiDecisions) {
+      if (!aiByMeme.has(decision.meme_id)) {
+        aiByMeme.set(decision.meme_id, parseAIResult(decision));
+      }
+    }
 
     const data = memes.map((m) => {
       const fullUrl = m.image_url || (m.storage_path && publicBase ? `${publicBase}/${m.storage_path.replace(/^\/+/, "")}` : "") || "";
       const memeReviews = reviewsByMeme.get(m.id) || [];
       const ai = aiByMeme.get(m.id);
-      const aiStatus = ai?.corpus_status ? ai.corpus_status.trim().toLowerCase().replace("exclude", "excluded").replace("review later", "review_later").replace("later", "review_later") : null;
 
       // Determine consensus state
       let consensusStatus = "unreviewed";
@@ -231,10 +258,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         judges_count: memeReviews.length,
         judges: formattedReviews,
         ai_judge: ai ? {
-          corpus_status: aiStatus as AIPredictionRow["corpus_status"],
-          topics: parseJsonArray(ai.topics),
+          corpus_status: ai.corpus_status as "keep" | "excluded" | "duplicate" | "review_later" | null,
+          topics: ai.topics,
           tone: ai.tone,
-          humour_mechanisms: parseJsonArray(ai.humour_mechanisms),
+          humour_mechanisms: ai.humour_mechanisms,
           confidence: ai.confidence === null ? null : Number(ai.confidence),
           reasoning: ai.reasoning,
           model: ai.model,

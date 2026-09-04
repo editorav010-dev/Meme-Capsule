@@ -27,7 +27,8 @@ export default function CuratorComparisonTable({
 
   const getAiState = (ai: SuperMemeItem["ai_judge"]) => {
     if (!ai) return "missing";
-    const validStatus = ["keep", "excluded", "duplicate", "review_later"].includes(ai.corpus_status || "");
+    const validStatus = ai.corpus_status === null ||
+      ["keep", "excluded", "duplicate", "review_later"].includes(ai.corpus_status);
     const validTaxonomy =
       ai.topics.length <= 3 &&
       ai.topics.every((topic) => validTopics.has(topic)) &&
@@ -43,7 +44,7 @@ export default function CuratorComparisonTable({
   const getStatusLabel = (status: string | null) => {
     if (status === "excluded") return "EXCLUDE";
     if (status === "review_later") return "REVIEW_LATER";
-    return status ? status.toUpperCase() : "INVALID RESULT";
+    return status ? status.toUpperCase() : "ANALYSED";
   };
 
   const getStatusBadge = (status: string) => {
