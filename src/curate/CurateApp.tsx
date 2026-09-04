@@ -14,6 +14,7 @@ import CurationStatsModal from "./CurationStatsModal";
 import CurateLogin from "./CurateLogin";
 import CurateSuperDashboard from "./super/CurateSuperDashboard";
 import CurateAccountModal from "./CurateAccountModal";
+import AiPreJudgePanel from "./AiPreJudgePanel";
 import type { AiJudgeConfig, AiJudgeDecision } from "./ai-judge/aiJudgeTypes";
 import { DEFAULT_AI_JUDGE_CONFIG } from "./ai-judge/aiJudgeTypes";
 import AiJudgeConsole from "./ai-judge/AiJudgeConsole";
@@ -75,20 +76,18 @@ export default function CurateApp() {
   // AI Judge State & Hook
   const [aiConfig, setAiConfig] = useState<AiJudgeConfig>(DEFAULT_AI_JUDGE_CONFIG);
 
-  const handleApplyAiDecision = useCallback((decision: AiJudgeDecision) => {
-    setStatus(decision.corpus_status);
-    setTopics(decision.topics);
-    setTone(decision.tone);
-    setMechanisms(decision.humour_mechanisms);
-    setDuplicateOf(decision.duplicate_of || "");
-    setNote(decision.curator_note);
+  const handleApplyAiDecision = useCallback((_decision: AiJudgeDecision) => {
+    // AI previews remain advisory and must never populate human judge fields.
   }, []);
 
   const aiLoop = useAiJudgeLoop({
     currentMeme,
     config: aiConfig,
     onApplyDecision: handleApplyAiDecision,
-    onAdvance: () => handleSaveAndAdvance()
+    onAdvance: () => {
+      const memeId = stateRef.current.currentMeme?.id;
+      return memeId ? loadMeme(memeId, "next") : Promise.resolve(null);
+    }
   });
 
   const aiLoopRef = useRef(aiLoop);
@@ -605,6 +604,8 @@ export default function CurateApp() {
 
         {/* Right: Layer 0 Editorial & Multi-Dimensional Categorization */}
         <section style={{ display: "flex", flexDirection: "column" }}>
+          <AiPreJudgePanel prediction={currentMeme?.ai_prediction ?? null} />
+
           {/* Layer 0: Editorial Judgment */}
           <EditorialButtons
             currentStatus={status}
