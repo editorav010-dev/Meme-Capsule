@@ -56,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout for heavy vision reasoning models
+    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout for heavy vision reasoning models
 
     const downstreamRes = await fetch(endpoint, {
       method: "POST",
@@ -67,7 +67,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       clearTimeout(timeout);
       const isAbort = err.name === "AbortError" || err.message?.includes("aborted");
       const msg = isAbort
-        ? "Downstream model took longer than 60 seconds to respond and timed out."
+        ? "Downstream model took longer than 90 seconds to respond and timed out."
         : `Failed to connect to model endpoint: ${err.message}`;
       throw new Error(msg);
     });

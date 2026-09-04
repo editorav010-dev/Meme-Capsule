@@ -68,6 +68,7 @@ Do NOT treat every image as a meme! Exclude images that lack any punchline, sati
 ---
 ### 3. OUTPUT FORMAT:
 You MUST respond with a single, valid JSON object without markdown fences, preamble, or conversational commentary.
+Be direct and concise. Avoid lengthy chain-of-thought monologues; output the JSON object immediately:
 {
   "corpus_status": "keep" | "excluded" | "duplicate" | "review_later",
   "duplicate_of": null,
@@ -84,7 +85,7 @@ export const buildAiJudgeUserPrompt = (memeTitle?: string, memeId?: string): str
 ${memeTitle ? `Title / Reference: "${memeTitle}"` : ""}
 ${memeId ? `Meme ID: ${memeId}` : ""}
 
-Evaluate whether this is legitimate meme material or an ordinary non-meme image. Output only valid JSON.`;
+Evaluate whether this is legitimate meme material or an ordinary non-meme image. Keep internal reasoning minimal and output only the valid JSON object.`;
 };
 
 /**

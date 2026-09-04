@@ -166,6 +166,13 @@ export const analyzeMemeWithAi = async (
 ): Promise<AiJudgeDecision> => {
   const startTime = Date.now();
 
+  const isReasoningModel =
+    config.model.toLowerCase().includes("muse") ||
+    config.model.toLowerCase().includes("glimmer") ||
+    config.model.toLowerCase().includes("kimi") ||
+    config.model.toLowerCase().includes("reasoning") ||
+    config.model.toLowerCase().includes("think");
+
   const standardPayload: Record<string, unknown> = {
     model: config.model,
     messages: [
@@ -190,13 +197,17 @@ export const analyzeMemeWithAi = async (
       }
     ],
     temperature: 0.1,
-    max_tokens: 800,
-    response_format: { type: "json_object" }
+    max_tokens: 500
   };
+
+  // Only enable response_format on non-reasoning models to avoid token rejection loops
+  if (!isReasoningModel) {
+    standardPayload["response_format"] = { type: "json_object" };
+  }
 
   let data: any;
   try {
-    // Attempt 1: Standard structured request
+    // Attempt 1: Fast inference request
     data = await postCompletion(config, standardPayload);
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message.toLowerCase() : "";
