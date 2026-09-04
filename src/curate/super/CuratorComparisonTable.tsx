@@ -158,13 +158,7 @@ export default function CuratorComparisonTable({
                     )}
                       {(() => {
                         const aiState = getAiState(m.ai_judge);
-                        if (aiState === "missing") {
-                          return (
-                            <div style={{ background: "#242424", border: "1px solid #383838", padding: "4px 8px", fontSize: "11px", color: "#777" }}>
-                              <strong style={{ color: "#9b7bb2" }}>AI Judge:</strong> NOT JUDGED
-                            </div>
-                          );
-                        }
+                        if (aiState === "missing") return null;
                         if (aiState === "invalid") {
                           return (
                             <div style={{ background: "#242424", border: "1px solid #8d741c", padding: "4px 8px", fontSize: "11px", color: "#FF9F0A" }}>
@@ -187,12 +181,6 @@ export default function CuratorComparisonTable({
                             <div style={{ fontSize: "10px", color: "#888" }}>
                               {ai.tone || "No tone"} · {ai.humour_mechanisms.length ? ai.humour_mechanisms.join(", ") : "No mechanisms"} · {ai.confidence === null ? "No confidence" : `${Math.round(Math.max(0, Math.min(1, ai.confidence)) * 100)}% confidence`}
                             </div>
-                            {ai.reasoning && (
-                              <details style={{ marginTop: "4px", color: "#aaa", fontSize: "10px" }}>
-                                <summary style={{ cursor: "pointer", color: "#c58cff" }}>AI details</summary>
-                                <div style={{ marginTop: "3px" }}>{ai.reasoning}</div>
-                              </details>
-                            )}
                           </div>
                         );
                       })()}
