@@ -83,23 +83,21 @@ Neither human table should receive AI records.
 
 ## Current gap
 
-The Super Admin endpoint is `GET /api/curate/super/memes`. It bulk-loads
-`ai_curation_predictions` for the visible meme IDs and returns each row as
-`ai_judge`, alongside the human `judges` array. The frontend renders that object
+The Super Admin endpoint is `GET /api/curate/super/memes`. It bulk-loads successful
+`ai_cat_decisions` rows for the visible meme IDs, parses the structured
+`raw_response`, and returns the latest row per meme as `ai_judge`, alongside the human `judges` array. The frontend renders that object
 inside the existing `JUDGES DECISIONS` column without adding it to `judges_count`
 or consensus calculations.
 
 The existing external write route,
-`POST /api/admin/ai-categorise`, previously accepted only legacy numeric
-`category_id` data. It now also accepts the `/curate` fields and upserts the
-validated result into `ai_curation_predictions`. This keeps the producer's
-existing endpoint and legacy response compatible while making new structured
-AI results available to both `/curate` and Super Admin.
+`POST /api/admin/ai-categorise`, writes the AI decision history to
+`ai_cat_decisions`. Super Admin uses that table as the authoritative AI source;
+`ai_curation_predictions` is not used by the Super Admin AI Judge path.
 
 Existing legacy rows in `memes.ai_category` or `ai_cat_decisions` cannot be
 converted into the `/curate` taxonomy without inventing a mapping. They remain
 owned by the older `/categorise` system; only structured rows in
-`ai_curation_predictions` are displayed as the fourth AI Judge.
+`ai_cat_decisions` are displayed as the fourth AI Judge.
 
 The existing client-side AI console can generate a decision in React state and route
 it through the ordinary human save flow. That behavior is not suitable for an

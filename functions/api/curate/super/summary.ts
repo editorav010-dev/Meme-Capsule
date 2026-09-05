@@ -7,7 +7,7 @@
 import type { PagesFunction } from "../../../_shared/pages";
 import { json, type Env } from "../../../_shared/d1r2";
 import { validateSession } from "../../../_shared/catAuth";
-import { ensureAIPredictionTable, ensureCurationTables } from "../../../_shared/curateDb";
+import { ensureCurationTables } from "../../../_shared/curateDb";
 
 interface JudgeCountRow {
   user_id: string;
@@ -34,10 +34,37 @@ interface AICountRow {
   review_later: number;
 }
 
+interface AIDecisionRow {
+  id: string;
+  meme_id: string;
+  category_label: string | null;
+  raw_response: string | null;
+  created_at: string;
+  error: string | null;
+}
+
+function getAIDecision(row: AIDecisionRow): string | null {
+  let payload: Record<string, unknown> = {};
+  try {
+    const parsed = row.raw_response ? JSON.parse(row.raw_response) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      payload = parsed as Record<string, unknown>;
+    }
+  } catch {
+    payload = {};
+  }
+  const raw = payload.corpus_status ?? payload.decision ?? row.category_label;
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return ({
+    keep: "keep", kept: "keep", exclude: "excluded", excluded: "excluded",
+    duplicate: "duplicate", duplicates: "duplicate", later: "review_later",
+    "review later": "review_later", review_later: "review_later"
+  } as Record<string, string>)[value] || null;
+}
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     await ensureCurationTables(env.DB);
-    await ensureAIPredictionTable(env.DB);
     const sessionUser = await validateSession(request, env);
     if (!sessionUser || sessionUser.role !== "superadmin") {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
@@ -86,17 +113,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       review_later: 0
     };
     try {
-      const aiResult = await env.DB.prepare(`
-        SELECT
-          COUNT(*) as total_reviewed,
-          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) = 'keep' THEN 1 ELSE 0 END), 0) as kept,
-          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) IN ('excluded', 'exclude') THEN 1 ELSE 0 END), 0) as excluded,
-          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) = 'duplicate' THEN 1 ELSE 0 END), 0) as duplicates,
-          COALESCE(SUM(CASE WHEN lower(trim(corpus_status)) IN ('review_later', 'review later', 'later') THEN 1 ELSE 0 END), 0) as review_later
-        FROM ai_curation_predictions
-        WHERE lower(trim(corpus_status)) IN ('keep', 'excluded', 'exclude', 'duplicate', 'review_later', 'review later', 'later')
-      `).first<AICountRow>();
-      if (aiResult) aiJudge = aiResult;
+      const { results } = await env.DB.prepare(`
+        SELECT id, meme_id, category_label, raw_response, created_at, error
+        FROM ai_cat_decisions
+        WHERE error IS NULL
+        ORDER BY created_at DESC, id DESC
+      `).all<AIDecisionRow>();
+      for (const row of results || []) {
+        aiJudge.total_reviewed += 1;
+        const status = getAIDecision(row);
+        if (status === "keep") aiJudge.kept += 1;
+        else if (status === "excluded") aiJudge.excluded += 1;
+        else if (status === "duplicate") aiJudge.duplicates += 1;
+        else if (status === "review_later") aiJudge.review_later += 1;
+      }
     } catch {
       // AI storage is optional; human progress must remain available.
     }
