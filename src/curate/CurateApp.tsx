@@ -76,17 +76,27 @@ export default function CurateApp() {
   // AI Judge State & Hook
   const [aiConfig, setAiConfig] = useState<AiJudgeConfig>(DEFAULT_AI_JUDGE_CONFIG);
 
-  const handleApplyAiDecision = useCallback((_decision: AiJudgeDecision) => {
-    // AI previews remain advisory and must never populate human judge fields.
+  const handleApplyAiDecision = useCallback((decision: AiJudgeDecision) => {
+    setStatus(decision.corpus_status);
+    setTopics(decision.topics || []);
+    setTone(decision.tone || null);
+    setMechanisms(decision.humour_mechanisms || []);
+    setDuplicateOf(decision.duplicate_of || "");
+    const noteText = decision.curator_note
+      ? `[AI ${decision.modelUsed || "Vision"} ${Math.round((decision.confidence || 0) * 100)}%] ${decision.curator_note}`
+      : "";
+    setNote(noteText);
   }, []);
 
   const aiLoop = useAiJudgeLoop({
     currentMeme,
     config: aiConfig,
     onApplyDecision: handleApplyAiDecision,
-    onAdvance: () => {
+    onAdvance: async (decision?: AiJudgeDecision) => {
       const memeId = stateRef.current.currentMeme?.id;
-      return memeId ? loadMeme(memeId, "next") : Promise.resolve(null);
+      if (!memeId) return null;
+      const nextMeme = await handleSaveAndAdvance(undefined, decision);
+      return nextMeme;
     }
   });
 
@@ -187,10 +197,19 @@ export default function CurateApp() {
   }, [token, viewMode, loadMeme]);
 
   // Save current decision and advance
-  const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus): Promise<CurateMemeItem | null> => {
+  const handleSaveAndAdvance = useCallback(async (forcedStatus?: CorpusStatus, forcedDecision?: AiJudgeDecision): Promise<CurateMemeItem | null> => {
     const s = stateRef.current;
     if (!s.currentMeme || s.isSaving) return null;
-    const activeStatus = forcedStatus || s.status || "keep";
+
+    const activeStatus = forcedDecision?.corpus_status || forcedStatus || s.status || "keep";
+    const activeTopics = forcedDecision ? (forcedDecision.topics || []) : (activeStatus === "keep" ? s.topics : []);
+    const activeTone = forcedDecision ? (forcedDecision.tone || null) : (activeStatus === "keep" ? s.tone : null);
+    const activeMechanisms = forcedDecision ? (forcedDecision.humour_mechanisms || []) : (activeStatus === "keep" ? s.mechanisms : []);
+    const activeNote = forcedDecision
+      ? (forcedDecision.curator_note ? `[AI ${forcedDecision.modelUsed || "Vision"} ${Math.round((forcedDecision.confidence || 0) * 100)}%] ${forcedDecision.curator_note}` : null)
+      : (s.note || null);
+    const activeDuplicateOf = forcedDecision ? (forcedDecision.duplicate_of || null) : (activeStatus === "duplicate" ? s.duplicateOf : null);
+
     const currentMemeId = s.currentMeme.id;
 
     setIsSaving(true);
@@ -199,11 +218,11 @@ export default function CurateApp() {
     const snapshot: UndoHistoryItem = {
       meme: s.currentMeme,
       status: activeStatus,
-      topics: s.topics,
-      tone: s.tone,
-      mechanisms: s.mechanisms,
-      duplicateOf: s.duplicateOf,
-      note: s.note
+      topics: activeTopics,
+      tone: activeTone,
+      mechanisms: activeMechanisms,
+      duplicateOf: activeDuplicateOf || "",
+      note: activeNote || ""
     };
 
     setUndoStack((prev) => [...prev.slice(-20), snapshot]);
@@ -212,11 +231,11 @@ export default function CurateApp() {
       await saveCuration({
         meme_id: currentMemeId,
         corpus_status: activeStatus,
-        duplicate_of: activeStatus === "duplicate" ? s.duplicateOf : null,
-        topics: activeStatus === "keep" ? s.topics : [],
-        tone: activeStatus === "keep" ? s.tone : null,
-        humour_mechanisms: activeStatus === "keep" ? s.mechanisms : [],
-        curator_note: s.note || null,
+        duplicate_of: activeDuplicateOf,
+        topics: activeTopics,
+        tone: activeTone,
+        humour_mechanisms: activeMechanisms,
+        curator_note: activeNote,
         user_id: user?.id,
         user_name: user?.display_name
       });

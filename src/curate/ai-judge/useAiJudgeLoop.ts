@@ -7,7 +7,7 @@ interface UseAiJudgeLoopProps {
   currentMeme: CurateMemeItem | null;
   config: AiJudgeConfig;
   onApplyDecision: (decision: AiJudgeDecision) => void;
-  onAdvance: () => Promise<CurateMemeItem | null>;
+  onAdvance: (decision?: AiJudgeDecision) => Promise<CurateMemeItem | null>;
 }
 
 export function useAiJudgeLoop({
@@ -139,7 +139,7 @@ export function useAiJudgeLoop({
 
     let nextMeme: CurateMemeItem | null = null;
     try {
-      nextMeme = await onAdvance();
+      nextMeme = await onAdvance(decision);
     } catch (saveErr) {
       console.error("Auto advance save error:", saveErr);
     }

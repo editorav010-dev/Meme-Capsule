@@ -178,7 +178,7 @@ export const analyzeMemeWithAi = async (
     messages: [
       {
         role: "system",
-        content: buildAiJudgeSystemPrompt()
+        content: buildAiJudgeSystemPrompt(config.customInstructions)
       },
       {
         role: "user",
@@ -233,7 +233,7 @@ export const analyzeMemeWithAi = async (
                 content: [
                   {
                     type: "text",
-                    text: buildUnifiedAiJudgePrompt(meme.title, meme.id)
+                    text: buildUnifiedAiJudgePrompt(meme.title, meme.id, config.customInstructions)
                   },
                   {
                     type: "image_url",
@@ -247,7 +247,7 @@ export const analyzeMemeWithAi = async (
           : [
               {
                 role: "system",
-                content: buildAiJudgeSystemPrompt()
+                content: buildAiJudgeSystemPrompt(config.customInstructions)
               },
               {
                 role: "user",

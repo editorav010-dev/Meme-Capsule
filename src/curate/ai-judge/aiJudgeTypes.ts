@@ -107,6 +107,7 @@ export interface AiJudgeConfig {
   lowConfidenceFallback: "review_later" | "excluded";
   confidenceThreshold: number; // e.g. 0.6
   activePresetId?: string | null;
+  customInstructions?: string; // Pre-build batch instructions for AI judge
 }
 
 export const DEFAULT_AI_JUDGE_CONFIG: AiJudgeConfig = {
@@ -120,7 +121,8 @@ export const DEFAULT_AI_JUDGE_CONFIG: AiJudgeConfig = {
   batchCount: 25,
   lowConfidenceFallback: "review_later",
   confidenceThreshold: 0.6,
-  activePresetId: null
+  activePresetId: null,
+  customInstructions: ""
 };
 
 export interface AiJudgeDecision {

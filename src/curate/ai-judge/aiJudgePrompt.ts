@@ -4,14 +4,20 @@ import {
   CURATION_MECHANISMS
 } from "../curateTypes";
 
-export const buildAiJudgeSystemPrompt = (): string => {
+export const buildAiJudgeSystemPrompt = (customInstructions?: string): string => {
   const topicsList = CURATION_TOPICS.map((t) => `"${t.id}"`).join(", ");
   const tonesList = CURATION_TONES.map((t) => `"${t.id}"`).join(", ");
   const mechanismsList = CURATION_MECHANISMS.map((m) => `"${m.id}"`).join(", ");
 
+  const customBlock = customInstructions && customInstructions.trim() ? `
+---
+### BATCH-SPECIFIC SYSTEM INSTRUCTIONS (HIGH PRIORITY OVERRIDE):
+${customInstructions.trim()}
+` : "";
+
   return `You are an expert Meme Culture Analyst and Digital Curator evaluating internet content for a curated meme archive.
 Your primary objective is to separate authentic meme material from ordinary non-meme photographs with cultural nuance, sharp wit, and deep internet literacy.
-
+${customBlock}
 ---
 ### 1. THE CORE TEST: MEME INTENT & COMEDIC CONTEXT
 Before classifying, ask yourself: "Was this created, edited, or shared with intentional comedic, satirical, or meme intent?"
@@ -91,8 +97,8 @@ Evaluate whether this is legitimate meme material or an ordinary non-meme image.
 /**
  * Unified prompt for models that reject separate system roles in multimodal vision calls.
  */
-export const buildUnifiedAiJudgePrompt = (memeTitle?: string, memeId?: string): string => {
-  return `${buildAiJudgeSystemPrompt()}
+export const buildUnifiedAiJudgePrompt = (memeTitle?: string, memeId?: string, customInstructions?: string): string => {
+  return `${buildAiJudgeSystemPrompt(customInstructions)}
 
 ---
 IMAGE TO EVALUATE:

@@ -949,6 +949,122 @@ export default function AiJudgeConsole({
             </div>
           </div>
 
+          {/* Section E: Pre-Build Batch System Instructions */}
+          <div
+            style={{
+              paddingTop: "12px",
+              borderTop: "1px solid #282828",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px"
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Oswald, sans-serif",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#f4c300",
+                letterSpacing: "1px",
+                textTransform: "uppercase"
+              }}
+            >
+              PRE-BUILD BATCH INSTRUCTIONS (SYSTEM PROMPT OVERRIDE):
+            </div>
+            <textarea
+              rows={3}
+              value={config.customInstructions || ""}
+              onChange={(e) => updateConfigField("customInstructions", e.target.value)}
+              placeholder="e.g. Focus on tech & gaming memes. Exclude promotional material and plain non-meme photos. Only keep memes with high humor value."
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                background: "#121212",
+                border: "1px solid #444",
+                color: "#34C759",
+                fontFamily: "monospace",
+                fontSize: "12px",
+                outline: "none",
+                resize: "vertical"
+              }}
+            />
+            <div style={{ fontSize: "11px", color: "#888", fontFamily: "Oswald" }}>
+              QUICK INSTRUCTION PRESETS:
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => updateConfigField("customInstructions", "Be strict. Mark ambiguous or low-quality images as review_later. Only keep high-effort, genuine memes.")}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  background: "#222",
+                  color: "#f4c300",
+                  border: "1px solid #444",
+                  cursor: "pointer"
+                }}
+              >
+                🎯 Strict Quality Filter
+              </button>
+              <button
+                type="button"
+                onClick={() => updateConfigField("customInstructions", "Prioritize software, tech, gaming, and internet culture memes. Exclude corporate flyers.")}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  background: "#222",
+                  color: "#9b30ff",
+                  border: "1px solid #444",
+                  cursor: "pointer"
+                }}
+              >
+                🎮 Tech & Gaming Focus
+              </button>
+              <button
+                type="button"
+                onClick={() => updateConfigField("customInstructions", "Categorize all valid memes with relevant topics and dominant tone accurately.")}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  background: "#222",
+                  color: "#34C759",
+                  border: "1px solid #444",
+                  cursor: "pointer"
+                }}
+              >
+                ⚡ Fast Auto-Tagging
+              </button>
+              <button
+                type="button"
+                onClick={() => updateConfigField("customInstructions", "Exclude dark or sensitive humor. Prioritize wholesome, feel-good memes.")}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  background: "#222",
+                  color: "#FF9500",
+                  border: "1px solid #444",
+                  cursor: "pointer"
+                }}
+              >
+                🛡️ Wholesome Priority
+              </button>
+              <button
+                type="button"
+                onClick={() => updateConfigField("customInstructions", "")}
+                style={{
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  background: "#111",
+                  color: "#aaa",
+                  border: "1px solid #333",
+                  cursor: "pointer"
+                }}
+              >
+                🧹 Clear Instructions
+              </button>
+            </div>
+          </div>
+
           {/* Test Connection & Feedback */}
           <div
             style={{
