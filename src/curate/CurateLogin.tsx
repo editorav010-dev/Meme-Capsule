@@ -115,7 +115,7 @@ export default function CurateLogin({ onLoginSuccess }: CurateLoginProps) {
           )}
 
           <div style={{ marginTop: "12px", fontSize: "11px", color: "#666" }}>
-            Default accounts: <code>superadmin</code>, <code>judge1</code>, <code>judge2</code>, <code>judge3</code>
+            Default accounts: <code>superadmin</code>, <code>judge1</code>, <code>judge2</code>, <code>judge3</code>, <code>judge4</code>, <code>judge5</code>
           </div>
         </form>
       </div>

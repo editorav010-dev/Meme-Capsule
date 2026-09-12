@@ -16,3 +16,4 @@ CREATE TABLE IF NOT EXISTS cat_judge_ai_presets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_judge_ai_presets_user ON cat_judge_ai_presets(user_id);
+

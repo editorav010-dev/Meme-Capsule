@@ -38,7 +38,9 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
         ('user-superadmin', 'superadmin', 'Super Admin', '${DEFAULT_PASS_HASH}', 'superadmin', 1),
         ('user-judge1',     'judge1',     'Judge One',    '${DEFAULT_PASS_HASH}', 'judge',      1),
         ('user-judge2',     'judge2',     'Judge Two',    '${DEFAULT_PASS_HASH}', 'judge',      1),
-        ('user-judge3',     'judge3',     'Judge Three',  '${DEFAULT_PASS_HASH}', 'judge',      1);
+        ('user-judge3',     'judge3',     'Judge Three',  '${DEFAULT_PASS_HASH}', 'judge',      1),
+        ('user-judge4',     'judge4',     'Judge Four',   '${DEFAULT_PASS_HASH}', 'judge',      1),
+        ('user-judge5',     'judge5',     'Judge Five',   '${DEFAULT_PASS_HASH}', 'judge',      1);
 
       -- 4. Multi-User Meme Curation Table
       CREATE TABLE IF NOT EXISTS meme_curation (

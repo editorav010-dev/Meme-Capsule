@@ -31,7 +31,9 @@ VALUES
   ('user-superadmin', 'superadmin', 'Super Admin', '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'superadmin', 1),
   ('user-judge1',     'judge1',     'Judge One',    '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1),
   ('user-judge2',     'judge2',     'Judge Two',    '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1),
-  ('user-judge3',     'judge3',     'Judge Three',  '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1);
+  ('user-judge3',     'judge3',     'Judge Three',  '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1),
+  ('user-judge4',     'judge4',     'Judge Four',   '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1),
+  ('user-judge5',     'judge5',     'Judge Five',   '494a715f7e9b4071aca61bac42ca858a309524e5864f0920030862a4ae7589be', 'judge',      1);
 
 -- 4. Multi-User Meme Curation Decisions Table
 CREATE TABLE IF NOT EXISTS meme_curation (

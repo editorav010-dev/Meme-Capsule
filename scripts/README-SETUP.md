@@ -25,6 +25,8 @@ npx tsx scripts/setup-cat-users.ts
 | `judge1` | `judge` | `changeme123` | Judge One |
 | `judge2` | `judge` | `changeme123` | Judge Two |
 | `judge3` | `judge` | `changeme123` | Judge Three |
+| `judge4` | `judge` | `changeme123` | Judge Four |
+| `judge5` | `judge` | `changeme123` | Judge Five |
 
 ## 3. Accessing the Judge Portal
 - **URL**: `/#/categorise` (or click "Judge Portal" link in footer)
