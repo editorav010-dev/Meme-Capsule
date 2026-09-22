@@ -171,6 +171,11 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env }) => {
           { status: 400 }
         );
       }
+    } else if (row.status === "archived") {
+      // If manually archived from /admin, remove it from 'keep' in meme_curation_final
+      await env.DB.prepare(
+        "UPDATE meme_curation_final SET corpus_status = 'review_later', updated_at = ? WHERE meme_id = ? AND corpus_status = 'keep'"
+      ).bind(new Date().toISOString(), originalId).run();
     }
 
     await env.DB.prepare(
@@ -215,6 +220,11 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
     await env.DB.prepare(
       "UPDATE memes SET status = 'archived', is_active = 0 WHERE id = ?"
     ).bind(id).run();
+
+    // Synchronize meme_curation_final away from 'keep' so Superadmin reflects the archive
+    await env.DB.prepare(
+      "UPDATE meme_curation_final SET corpus_status = 'review_later', updated_at = ? WHERE meme_id = ? AND corpus_status = 'keep'"
+    ).bind(new Date().toISOString(), id).run();
 
     const { results } = await env.DB.prepare(
       "SELECT * FROM memes WHERE id = ?"

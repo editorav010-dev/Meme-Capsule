@@ -159,7 +159,23 @@ Destructive actions use the meme ID stored on the report rather than trusting a
 browser-supplied target. The dashboard requires `ADMIN_API_TOKEN` and asks for
 confirmation before removing or blacklisting content.
 
-Public routes (`/api/random-meme`, `/api/daily-meme`) never use the admin token. They only return rows with `status = 'active'`, `is_active = 1`, and an authoritative finalization in `meme_curation_final` with `corpus_status = 'keep'`. All unfinalized or excluded memes are maintained in `status = 'archived'` (`is_active = 0`) and are excluded at the SQL query level.
+Public routes (`/api/random-meme`, `/api/daily-meme`, `/api/memes/random`) never use the admin token. They only return rows with `status = 'active'`, `is_active = 1`, and an authoritative finalization in `meme_curation_final` with `corpus_status = 'keep'`. All unfinalized or excluded memes are maintained in `status = 'archived'` (`is_active = 0`) and are excluded at the SQL query level.
+
+## Authoritative Resolution & Active Pool Synchronization
+
+The platform enforces a canonical single-source-of-truth contract:
+1. **`meme_curation_final` Table**:
+   - `corpus_status = 'keep'`: Memes approved by Superadmin for the public Capsule.
+   - `corpus_status = 'excluded'`: Memes rejected / discarded by Superadmin.
+2. **`memes` Table**:
+   - `status = 'active'`, `is_active = 1`: Strictly maps 1-to-1 with `corpus_status = 'keep'` (currently 111 memes).
+   - `status = 'archived'`, `is_active = 0`: All non-finalized memes (4,947) plus all authoritatively excluded memes (53) = 5,000 memes.
+3. **Dashboard Reporting**:
+   - Both `/admin` and Superadmin Command Center report **111 Active / Authoritative Resolved** memes.
+   - Superadmin provides an additional transparent indicator for the 53 excluded decisions ($111 + 53 = 164$ total editorial decisions).
+4. **Migration 011 (`011_reconcile_active_and_curation_sync.sql`)**:
+   - Eliminates drift by enforcing $\text{status} = \text{'active'} \iff \text{is\_active} = 1$.
+   - Reconciles any legacy rows so the active public spawn pool strictly contains only authoritatively approved memes.
 
 ## Google Drive Workflow
 

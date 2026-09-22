@@ -40,15 +40,26 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ).first<{ cnt: number }>();
     const totalMemes = totalCountRes?.cnt ?? 0;
 
-    // 2. Final resolved count
-    let resolvedCount = 0;
+    // 2. Final resolved count (Authoritative Keep / Active vs Excluded)
+    let resolvedActiveCount = 0;
+    let resolvedExcludedCount = 0;
+    let totalResolvedCount = 0;
     try {
-      const finalRes = await env.DB.prepare(
-        "SELECT COUNT(*) as cnt FROM meme_curation_final"
-      ).first<{ cnt: number }>();
-      resolvedCount = finalRes?.cnt ?? 0;
+      const finalRes = await env.DB.prepare(`
+        SELECT 
+          COUNT(*) as total_resolved,
+          SUM(CASE WHEN corpus_status = 'keep' THEN 1 ELSE 0 END) as resolved_active,
+          SUM(CASE WHEN corpus_status = 'excluded' THEN 1 ELSE 0 END) as resolved_excluded
+        FROM meme_curation_final
+      `).first<{ total_resolved: number; resolved_active: number; resolved_excluded: number }>();
+
+      totalResolvedCount = finalRes?.total_resolved ?? 0;
+      resolvedActiveCount = finalRes?.resolved_active ?? 0;
+      resolvedExcludedCount = finalRes?.resolved_excluded ?? 0;
     } catch {
-      resolvedCount = 0;
+      totalResolvedCount = 0;
+      resolvedActiveCount = 0;
+      resolvedExcludedCount = 0;
     }
 
     // 3. Per-judge progress breakdown (Active human judges only)
@@ -112,8 +123,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     return json({
       total_memes: totalMemes,
-      resolved_count: resolvedCount,
-      percent_resolved: totalMemes > 0 ? Math.round((resolvedCount / totalMemes) * 100) : 0,
+      resolved_count: resolvedActiveCount, // Canonical Authoritative Active count (111) — matches /admin Active!
+      resolved_active_count: resolvedActiveCount,
+      resolved_excluded_count: resolvedExcludedCount,
+      total_resolved_count: totalResolvedCount,
+      percent_resolved: totalMemes > 0 ? Math.round((resolvedActiveCount / totalMemes) * 100) : 0,
       consensus_metrics: {
         unreviewed,
         single_review: singleReview,

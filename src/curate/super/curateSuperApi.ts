@@ -21,6 +21,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export interface SuperSummaryResponse {
   total_memes: number;
   resolved_count: number;
+  resolved_active_count?: number;
+  resolved_excluded_count?: number;
+  total_resolved_count?: number;
   percent_resolved: number;
   consensus_metrics: {
     unreviewed: number;

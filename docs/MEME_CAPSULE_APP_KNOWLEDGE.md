@@ -381,7 +381,11 @@ Designed for rapid, high-volume human evaluation. Curators can review hundreds o
 - `Cmd/Ctrl + Z`: Instant undo last curation decision.
 
 ### 4.6 SuperAdmin Conflict Resolution & Multi-Judge Consensus
-When two or more judges evaluate the same meme with conflicting verdicts (e.g., Judge A votes `keep`, Judge B votes `excluded`), the meme surfaces in the **SuperAdmin Command Center**. Superadmins review both sets of notes, inspect topics, and cast the binding authoritative decision written into `meme_curation_final`.
+When two or more judges evaluate the same meme with conflicting verdicts (e.g., Judge A votes `keep`, Judge B votes `excluded`), the meme surfaces in the **SuperAdmin Command Center**. Superadmins review judge notes, inspect topics, and cast the binding authoritative decision written into `meme_curation_final`:
+- **Authoritative Keep (`corpus_status = 'keep'`)**: Automatically activates the meme in `memes` (`status = 'active'`, `is_active = 1`), registering it in the live public spawn pool.
+- **Authoritative Excluded (`corpus_status = 'excluded'`)**: Sets the meme to `status = 'archived'` (`is_active = 0`), permanently excluding it from public drops.
+- **Status & Count Synchronization**: Superadmin Command Center and `/admin` read from this canonical database state. Superadmin displays `AUTHORITATIVE RESOLVED (ACTIVE)` matching `/admin Active` (currently 111 memes), alongside an explicit indicator of authoritatively excluded decisions (53 excluded memes, totaling 164 historical resolutions).
+- **Public Spawn Gating**: The public delivery APIs (`/api/random-meme`, `/api/daily-meme`, `/api/memes/random`) strictly require an inner join on `meme_curation_final` with `corpus_status = 'keep'`, ensuring unfinalized or excluded memes can never enter user capsule drops.
 
 ### 4.7 AI Pre-Judge Assisted Loop (`/ai-judge`)
 A serverless multimodal pipeline powered by Google Gemini Vision (`gemini-1.5-flash`):

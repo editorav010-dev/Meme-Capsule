@@ -77,7 +77,7 @@ export default function CurateSuperDashboard({
             🛡️ CURATOR SUPER ADMIN COMMAND CENTER
           </span>
           <span style={{ fontSize: "11px", background: "#262626", padding: "3px 8px", borderRadius: "2px", color: "#34C759", fontFamily: "monospace" }}>
-            {summary ? `${summary.resolved_count} / ${summary.total_memes} FINAL RESOLVED (${summary.percent_resolved}%)` : "LOADING..."}
+            {summary ? `${summary.resolved_count} ACTIVE / ${summary.total_memes} (${summary.total_resolved_count ?? summary.resolved_count} RESOLVED)` : "LOADING..."}
           </span>
           {lastRefreshed && (
             <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }}>
@@ -153,7 +153,14 @@ export default function CurateSuperDashboard({
             </div>
 
             <div style={{ background: "#1c1b1b", border: "1px solid #34C759", padding: "14px" }}>
-              <div style={{ fontSize: "11px", color: "#34C759" }}>AUTHORITATIVE RESOLVED</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: "11px", color: "#34C759" }}>AUTHORITATIVE RESOLVED</div>
+                {summary.resolved_excluded_count !== undefined && summary.resolved_excluded_count > 0 && (
+                  <span style={{ fontSize: "10px", color: "#FF3B30", fontFamily: "monospace" }} title="Authoritatively Excluded Memes">
+                    {summary.resolved_excluded_count} EXCL
+                  </span>
+                )}
+              </div>
               <div className="curate-anton" style={{ fontSize: "26px", color: "#34C759" }}>{summary.resolved_count}</div>
             </div>
 
