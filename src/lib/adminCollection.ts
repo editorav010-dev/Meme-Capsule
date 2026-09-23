@@ -8,6 +8,9 @@ export type AdminMeme = Meme & {
   status: MemeStatus;
   media_type: MemeMediaType;
   input_method: MemeInputMethod;
+  curation_status?: "keep" | "excluded" | "duplicate" | "review_later" | null;
+  final_status?: string | null;
+  is_finalized_keep?: boolean;
 };
 
 export const ADMIN_COLLECTION_KEY = "meme-capsule:admin-collection";
@@ -45,7 +48,10 @@ export const normalizeAdminMeme = (meme: Partial<AdminMeme>): AdminMeme => ({
   input_method: (meme.input_method || "url") as MemeInputMethod,
   uploaded_at: meme.uploaded_at || new Date().toISOString(),
   share_text: meme.share_text?.trim() || meme.title?.trim() || "Spawned from Meme Capsule",
-  rights_note: meme.rights_note?.trim() || "reviewed"
+  rights_note: meme.rights_note?.trim() || "reviewed",
+  curation_status: meme.curation_status ?? null,
+  final_status: meme.final_status ?? null,
+  is_finalized_keep: meme.is_finalized_keep ?? (meme.curation_status === "keep")
 });
 
 export const readAdminCollection = () =>

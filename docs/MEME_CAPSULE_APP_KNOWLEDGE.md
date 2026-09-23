@@ -327,8 +327,9 @@ Meme Capsule uses Cloudflare D1 (serverless SQLite). The database schema has evo
    - `category` (TEXT): Primary humor category.
    - `tags` (TEXT): JSON array of string tags.
    - `rarity` (TEXT): Drop rarity (`Common`, `Rare`, `Legendary`).
-   - `status` (TEXT): Lifecycle state (`approved`, `archived`, `rejected`).
+   - `status` (TEXT): Lifecycle state (`active`, `archived`, `draft`).
    - `is_active` (INTEGER): Delivery flag (1 = active, 0 = inactive).
+   - `curation_status` (TEXT DEFAULT NULL): Explicit editorial status (`keep`, `excluded`, `duplicate`, `review_later`, or `NULL` for uncurated backlog). Added in Migration 012 to partition the corpus cleanly into Active Capsule (111), Superadmin Excluded (53), and Uncurated Backlog (4,947).
    - `created_at`, `updated_at` (DATETIME).
 
 2. **`meme_curation` (Judge Consensus Votes):**
@@ -382,9 +383,16 @@ Designed for rapid, high-volume human evaluation. Curators can review hundreds o
 
 ### 4.6 SuperAdmin Conflict Resolution & Multi-Judge Consensus
 When two or more judges evaluate the same meme with conflicting verdicts (e.g., Judge A votes `keep`, Judge B votes `excluded`), the meme surfaces in the **SuperAdmin Command Center**. Superadmins review judge notes, inspect topics, and cast the binding authoritative decision written into `meme_curation_final`:
-- **Authoritative Keep (`corpus_status = 'keep'`)**: Automatically activates the meme in `memes` (`status = 'active'`, `is_active = 1`), registering it in the live public spawn pool.
-- **Authoritative Excluded (`corpus_status = 'excluded'`)**: Sets the meme to `status = 'archived'` (`is_active = 0`), permanently excluding it from public drops.
-- **Status & Count Synchronization**: Superadmin Command Center and `/admin` read from this canonical database state. Superadmin displays `AUTHORITATIVE RESOLVED (ACTIVE)` matching `/admin Active` (currently 111 memes), alongside an explicit indicator of authoritatively excluded decisions (53 excluded memes, totaling 164 historical resolutions).
+- **Authoritative Keep (`corpus_status = 'keep'`)**: Automatically activates the meme in `memes` (`status = 'active'`, `is_active = 1`, `curation_status = 'keep'`), registering it in the live public spawn pool (111 memes).
+- **Authoritative Excluded (`corpus_status = 'excluded'`)**: Sets the meme to `status = 'archived'`, `is_active = 0`, and `curation_status = 'excluded'`, permanently isolating it from public drops while preserving it for editorial audit (53 memes).
+- **Status & Count Synchronization**: Superadmin Command Center and `/admin` read from this canonical database state:
+  - Superadmin displays `AUTHORITATIVE RESOLVED (ACTIVE)` matching `/admin Active` (exactly 111 memes), alongside an explicit indicator of authoritatively excluded decisions (53 excluded memes, totaling 164 historical resolutions).
+  - `/admin` provides a dedicated 5-way status metric bar and filter tabs:
+    - **Total Memes:** 5,111
+    - **Active:** 111 (spawn-eligible in public APK)
+    - **Excluded:** 53 (superadmin-rejected; displayed with high-visibility red badge)
+    - **Archived:** 4,947 (uncurated backlog awaiting judge/superadmin review)
+    - **Drafts:** 0 (local browser drafts)
 - **Public Spawn Gating**: The public delivery APIs (`/api/random-meme`, `/api/daily-meme`, `/api/memes/random`) strictly require an inner join on `meme_curation_final` with `corpus_status = 'keep'`, ensuring unfinalized or excluded memes can never enter user capsule drops.
 
 ### 4.7 AI Pre-Judge Assisted Loop (`/ai-judge`)

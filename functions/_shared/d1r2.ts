@@ -27,6 +27,7 @@ export type D1MemeRow = {
   tags: string | null;
   rarity: string | null;
   status: string | null;
+  curation_status?: string | null;
   media_type: string | null;
   input_method: string | null;
   is_active: number;
@@ -108,6 +109,7 @@ export const normalizeRow = (env: Env, row: D1MemeRow): Meme => ({
   tags: parseTags(row.tags),
   rarity: (row.rarity as Meme["rarity"]) || "Common",
   status: (row.status as Meme["status"]) || "active",
+  curation_status: (row.curation_status as Meme["curation_status"]) || null,
   media_type: (row.media_type as Meme["media_type"]) || "image",
   input_method: (row.input_method as Meme["input_method"]) || "url",
   uploaded_at: row.uploaded_at || new Date().toISOString(),

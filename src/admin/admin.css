@@ -409,6 +409,7 @@
 .badge.active { background: var(--secondary); color: var(--on-secondary); }
 .badge.draft { background: var(--tertiary-container); color: var(--on-tertiary-container); }
 .badge.archived { background: var(--surface-bright); color: var(--outline); }
+.badge.excluded { background: #FF3B30; color: #ffffff; }
 
 .likes-count {
   color: var(--outline);

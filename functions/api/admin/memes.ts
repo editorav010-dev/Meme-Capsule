@@ -94,6 +94,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     memes: results.map((row) => ({
       ...normalizeRow(env, row),
       final_status: row.final_status || null,
+      curation_status: row.curation_status || row.final_status || null,
       is_finalized_keep: row.final_status === "keep"
     })),
     config: {
@@ -172,10 +173,14 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env }) => {
         );
       }
     } else if (row.status === "archived") {
-      // If manually archived from /admin, remove it from 'keep' in meme_curation_final
+      // If manually archived from /admin, remove it from 'keep' in meme_curation_final and memes table
       await env.DB.prepare(
         "UPDATE meme_curation_final SET corpus_status = 'review_later', updated_at = ? WHERE meme_id = ? AND corpus_status = 'keep'"
       ).bind(new Date().toISOString(), originalId).run();
+
+      await env.DB.prepare(
+        "UPDATE memes SET curation_status = 'review_later' WHERE id = ? AND curation_status = 'keep'"
+      ).bind(originalId).run();
     }
 
     await env.DB.prepare(
@@ -218,7 +223,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     await env.DB.prepare(
-      "UPDATE memes SET status = 'archived', is_active = 0 WHERE id = ?"
+      "UPDATE memes SET status = 'archived', is_active = 0, curation_status = CASE WHEN curation_status = 'keep' THEN 'review_later' ELSE curation_status END WHERE id = ?"
     ).bind(id).run();
 
     // Synchronize meme_curation_final away from 'keep' so Superadmin reflects the archive

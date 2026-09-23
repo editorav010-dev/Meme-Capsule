@@ -99,7 +99,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       const newStatus = r.corpus_status === "keep" ? "active" : "archived";
 
       stmts.push(
-        env.DB.prepare("UPDATE memes SET is_active = ?, status = ? WHERE id = ?").bind(isActive, newStatus, r.meme_id)
+        env.DB.prepare("UPDATE memes SET is_active = ?, status = ?, curation_status = ? WHERE id = ?").bind(isActive, newStatus, r.corpus_status, r.meme_id)
       );
     }
 

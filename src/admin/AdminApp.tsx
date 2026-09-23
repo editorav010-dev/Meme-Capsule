@@ -88,11 +88,15 @@ const MemeRow = React.memo(function MemeRow({ meme, backendMode, onEdit, onDelet
         {!meme.url && <span className="material-symbols-outlined" style={{ zIndex: 2 }}>image</span>}
       </div>
       <div className="collection-meta">
-        <h4 style={{ textDecoration: meme.status === "archived" ? "line-through" : "none" }}>
+        <h4 style={{ textDecoration: meme.status === "archived" || meme.curation_status === "excluded" ? "line-through" : "none" }}>
           {meme.title || "Untitled Meme"}
         </h4>
         <div className="badge-row">
-          <span className={`badge brutalist-border-sm ${meme.status}`}>{meme.status}</span>
+          {meme.curation_status === "excluded" ? (
+            <span className="badge brutalist-border-sm excluded">EXCLUDED</span>
+          ) : (
+            <span className={`badge brutalist-border-sm ${meme.status}`}>{meme.status}</span>
+          )}
           <span className="likes-count">
             <span className="material-symbols-outlined">favorite</span> {meme.likes_count ?? 0}
           </span>
@@ -156,7 +160,7 @@ export default function AdminApp() {
 
   // Filtering & Pagination
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived" | "excluded">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -175,22 +179,26 @@ export default function AdminApp() {
   const stats = useMemo(() => {
     let active = 0;
     let drafts = 0;
-    let archived = 0;
+    let uncurated = 0;
+    let excluded = 0;
     for (const m of collection) {
       if (m.status === "active") active++;
       else if (m.status === "draft") drafts++;
-      else if (m.status === "archived") archived++;
+      else if (m.curation_status === "excluded") excluded++;
+      else uncurated++; // status === "archived" and not excluded
     }
-    return { active, drafts, archived, total: collection.length };
+    return { active, drafts, archived: uncurated, excluded, total: collection.length };
   }, [collection]);
 
   // Filtered and paginated list for instantaneous UI responsiveness
   const filteredCollection = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     return collection.filter((meme) => {
-      if (statusFilter !== "all" && meme.status !== statusFilter) {
-        return false;
-      }
+      if (statusFilter === "active" && meme.status !== "active") return false;
+      if (statusFilter === "draft" && meme.status !== "draft") return false;
+      if (statusFilter === "excluded" && meme.curation_status !== "excluded") return false;
+      if (statusFilter === "archived" && (meme.status !== "archived" || meme.curation_status === "excluded")) return false;
+
       if (!term) return true;
       return (
         (meme.title && meme.title.toLowerCase().includes(term)) ||
@@ -610,7 +618,7 @@ export default function AdminApp() {
         </nav>
 
         <div className="content-canvas">
-          <section className="top-stats-bar">
+          <section className="top-stats-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
             <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
               <p>Total Memes</p>
               <p className="stat-value total">{stats.total}</p>
@@ -619,13 +627,17 @@ export default function AdminApp() {
               <p>Active</p>
               <p className="stat-value active">{stats.active}</p>
             </div>
-            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
-              <p>Drafts</p>
-              <p className="stat-value drafts">{stats.drafts}</p>
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive" style={{ borderLeft: "4px solid #FF3B30" }}>
+              <p style={{ color: "#FF3B30" }}>Excluded</p>
+              <p className="stat-value" style={{ color: "#FF3B30" }}>{stats.excluded}</p>
             </div>
             <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
               <p>Archived</p>
               <p className="stat-value archived">{stats.archived}</p>
+            </div>
+            <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
+              <p>Drafts</p>
+              <p className="stat-value drafts">{stats.drafts}</p>
             </div>
           </section>
 
@@ -681,7 +693,7 @@ export default function AdminApp() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <h3>Meme Vault ({filteredCollection.length})</h3>
                     <div style={{ display: "flex", gap: "4px" }}>
-                      {(["all", "active", "draft", "archived"] as const).map((st) => (
+                      {(["all", "active", "excluded", "archived", "draft"] as const).map((st) => (
                         <button
                           key={st}
                           type="button"
@@ -695,12 +707,12 @@ export default function AdminApp() {
                             fontSize: "11px",
                             fontWeight: 700,
                             textTransform: "uppercase",
-                            background: statusFilter === st ? "var(--primary)" : "var(--surface)",
-                            color: statusFilter === st ? "var(--on-primary)" : "var(--on-surface)",
+                            background: statusFilter === st ? (st === "excluded" ? "#FF3B30" : "var(--primary)") : "var(--surface)",
+                            color: statusFilter === st ? "#ffffff" : "var(--on-surface)",
                             cursor: "pointer"
                           }}
                         >
-                          {st}
+                          {st === "all" ? `all (${stats.total})` : st === "active" ? `active (${stats.active})` : st === "excluded" ? `excluded (${stats.excluded})` : st === "archived" ? `archived (${stats.archived})` : `draft (${stats.drafts})`}
                         </button>
                       ))}
                     </div>
@@ -740,7 +752,7 @@ export default function AdminApp() {
                 </div>
 
                 {/* Bulk Actions */}
-                {statusFilter === "archived" && (
+                {(statusFilter === "archived" || statusFilter === "excluded") && (
                   <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", padding: "12px", background: "var(--surface-container)", border: "2px solid black" }}>
                     <button
                       type="button"
@@ -783,7 +795,7 @@ export default function AdminApp() {
                         onDelete={deleteMeme}
                         isSelected={selectedIds.has(meme.id)}
                         onToggleSelect={handleToggleSelect}
-                        isArchivedView={statusFilter === "archived"}
+                        isArchivedView={statusFilter === "archived" || statusFilter === "excluded"}
                         onHardDelete={(id) => hardDeleteMemes([id])}
                       />
                     ))

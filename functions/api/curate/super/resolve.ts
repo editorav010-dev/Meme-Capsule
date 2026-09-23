@@ -114,15 +114,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     if (corpusStatus === "keep" && topics.length > 0) {
       await env.DB.prepare(
-        "UPDATE memes SET is_active = ?, status = ?, tags = ?, category = COALESCE(?, category) WHERE id = ?"
+        "UPDATE memes SET is_active = ?, status = ?, curation_status = ?, tags = ?, category = COALESCE(?, category) WHERE id = ?"
       )
-        .bind(isActive, newStatus, JSON.stringify(topics), topics[0] || null, memeId)
+        .bind(isActive, newStatus, corpusStatus, JSON.stringify(topics), topics[0] || null, memeId)
         .run();
     } else {
       await env.DB.prepare(
-        "UPDATE memes SET is_active = ?, status = ? WHERE id = ?"
+        "UPDATE memes SET is_active = ?, status = ?, curation_status = ? WHERE id = ?"
       )
-        .bind(isActive, newStatus, memeId)
+        .bind(isActive, newStatus, corpusStatus, memeId)
         .run();
     }
 

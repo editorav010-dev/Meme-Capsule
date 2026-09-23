@@ -73,6 +73,7 @@ Core fields:
 - `rights_note`: `original`, `licensed`, `permission`, or `reviewed`.
 - `share_text`: text used by share actions.
 - `random_key`: indexed random selection helper (REAL type).
+- `curation_status`: `keep`, `excluded`, `duplicate`, `review_later`, or `NULL`. Added in Migration 012 to partition non-active memes into authoritatively rejected (`excluded`) vs uncurated backlog (`NULL`).
 
 Only records with `status = 'active'` and `is_active = 1` should be returned to users.
 
@@ -163,19 +164,23 @@ Public routes (`/api/random-meme`, `/api/daily-meme`, `/api/memes/random`) never
 
 ## Authoritative Resolution & Active Pool Synchronization
 
-The platform enforces a canonical single-source-of-truth contract:
+The platform enforces a canonical single-source-of-truth contract across `memes` and `meme_curation_final`:
 1. **`meme_curation_final` Table**:
-   - `corpus_status = 'keep'`: Memes approved by Superadmin for the public Capsule.
-   - `corpus_status = 'excluded'`: Memes rejected / discarded by Superadmin.
-2. **`memes` Table**:
-   - `status = 'active'`, `is_active = 1`: Strictly maps 1-to-1 with `corpus_status = 'keep'` (currently 111 memes).
-   - `status = 'archived'`, `is_active = 0`: All non-finalized memes (4,947) plus all authoritatively excluded memes (53) = 5,000 memes.
-3. **Dashboard Reporting**:
-   - Both `/admin` and Superadmin Command Center report **111 Active / Authoritative Resolved** memes.
-   - Superadmin provides an additional transparent indicator for the 53 excluded decisions ($111 + 53 = 164$ total editorial decisions).
-4. **Migration 011 (`011_reconcile_active_and_curation_sync.sql`)**:
-   - Eliminates drift by enforcing $\text{status} = \text{'active'} \iff \text{is\_active} = 1$.
-   - Reconciles any legacy rows so the active public spawn pool strictly contains only authoritatively approved memes.
+   - `corpus_status = 'keep'`: Memes approved by Superadmin for the public Capsule (111 memes).
+   - `corpus_status = 'excluded'`: Memes rejected / discarded by Superadmin (53 memes).
+   - Total Editorial Decisions: 164.
+2. **`memes` Table (3-Way Partitioning via `curation_status`)**:
+   - **Active Public Capsule** (`status = 'active'`, `is_active = 1`, `curation_status = 'keep'`): Strictly maps 1-to-1 with authoritative keep decisions (111 memes).
+   - **Superadmin Excluded** (`status = 'archived'`, `is_active = 0`, `curation_status = 'excluded'`): Strictly isolated rejected memes (53 memes). Ineligible for public spawn.
+   - **Uncurated Backlog** (`status = 'archived'`, `is_active = 0`, `curation_status IS NULL`): Memes awaiting curator / judge review (4,947 memes).
+   - Total Corpus: 5,111 memes ($111 + 53 + 4,947 = 5,111$).
+3. **Dashboard & UI Synchronization**:
+   - Superadmin Command Center reports **111 Authoritative Resolved** memes with a dedicated badge for **53 Excluded**.
+   - `/admin` top stats bar displays **Total (5,111)**, **Active (111)**, **Excluded (53)**, **Archived (4,947)**, and **Drafts (0)**.
+   - Filtering by `[EXCLUDED]` in `/admin` renders the 53 rejected items with bright red `EXCLUDED` badges, distinct from general backlog items.
+4. **Migrations**:
+   - **Migration 011 (`011_reconcile_active_and_curation_sync.sql`)**: Eliminated drift by enforcing $\text{status} = \text{'active'} \iff \text{is\_active} = 1$.
+   - **Migration 012 (`012_add_curation_status_to_memes.sql`)**: Added `curation_status` column to `memes`, backfilling `'keep'` (111) and `'excluded'` (53) from `meme_curation_final` while leaving uncurated backlog items as `NULL`. Automatically maintained on all future superadmin single and bulk resolutions.
 
 ## Google Drive Workflow
 

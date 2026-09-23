@@ -16,6 +16,7 @@ export type Meme = {
   rights_note?: string;
   source_link?: string;
   status?: MemeStatus;
+  curation_status?: "keep" | "excluded" | "duplicate" | "review_later" | null;
   media_type?: MemeMediaType;
   input_method?: MemeInputMethod;
   likes_count?: number;
