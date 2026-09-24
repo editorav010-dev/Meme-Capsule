@@ -26,7 +26,9 @@ meme application/
 │   ├── MEME_CAPSULE_APP_KNOWLEDGE.md                 # Master canonical product & architecture spec
 │   ├── PRIVACY_COOKIES_AND_DATA_FLOWS.md             # Privacy, cookies, Formspree, AdMob audit
 │   ├── PROJECT_STRUCTURE.md                          # This file
-│   └── README.md                                     # Project overview and setup guide
+│   ├── README_ANALYTICS.md                           # Analytics tracking SDK, ingestion & aggregation
+│   ├── README.md                                     # Project overview and setup guide
+│   └── report.md                                     # Google Lighthouse audit & edge optimization report
 ├── functions                                         # Cloudflare Pages Functions (serverless API)
 │   ├── _shared                                       # Shared utilities for all API routes
 │   │   ├── d1r2.ts                                   # D1 + R2 helper (NEW — replaces supabase.ts)

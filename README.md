@@ -7,6 +7,8 @@ All project documentation and resources have been moved to the dedicated `docs/`
 - [Privacy, Cookies & Data Flows](docs/PRIVACY_COOKIES_AND_DATA_FLOWS.md) - Telemetry, cookies, Formspree, AdMob, and compliance audit.
 - [Project Structure](docs/PROJECT_STRUCTURE.md) - File and folder layouts, architecture mappings, and data flows.
 - [Database & Storage](docs/DATABASE.md) - Cloudflare D1 (SQLite) and R2 storage specifications.
+- [Analytics Architecture](docs/README_ANALYTICS.md) - Analytics tracking SDK, ingestion API, and worker pipeline.
+- [Lighthouse Optimization Report](docs/report.md) - Performance, accessibility, security, and edge caching audit.
 - [Changelog](docs/CHANGELOG.md) - Full version release history.
 - [Claude Configuration](docs/CLAUDE.md) - Developer commands and environment settings.
 

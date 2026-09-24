@@ -16,6 +16,8 @@ Meme Capsule operates across two distinct codebases:
 - [`docs/PRIVACY_COOKIES_AND_DATA_FLOWS.md`](./PRIVACY_COOKIES_AND_DATA_FLOWS.md) — Exhaustive audit of website cookies, Formspree contact form, GA4 telemetry, AdMob integration, and Google Play Data Safety declarations.
 - [`docs/DATABASE.md`](./DATABASE.md) — Cloudflare D1 SQLite database schemas, migrations, and R2 media bucket architecture.
 - [`docs/PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) — Detailed directory mapping, route mappings, and component hierarchy.
+- [`docs/README_ANALYTICS.md`](./README_ANALYTICS.md) — Analytics tracking SDK, ingestion API, and worker aggregation pipeline.
+- [`docs/report.md`](./report.md) — Google Lighthouse audit analysis, Core Web Vitals, accessibility, and backend caching remediation report.
 - [`docs/CHANGELOG.md`](./CHANGELOG.md) — Release history and migration milestones.
 - [`docs/CLAUDE.md`](./CLAUDE.md) — Local development, Wrangler commands, and environment settings.
 
