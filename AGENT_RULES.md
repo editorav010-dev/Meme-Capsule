@@ -137,3 +137,26 @@ Before committing and pushing to git, confirm:
 ## 8. Summary Reminder
 
 > **Read First → Change Only What Is Needed → Protect Established Architecture → Build & Test → Keep All Markdown Docs Synced → Commit & Push.**
+
+---
+
+## 9. Shared Project Knowledge — MEME_CAPSULE_KNOWLEDGE.md
+
+The single source of truth for all project-wide context, architecture, decisions, and cross-codebase knowledge lives in `.knowledge/MEME_CAPSULE_KNOWLEDGE.md`.
+It is NOT part of this repository — it syncs via a separate GitHub repository (`editorav010-dev/meme-capsule-sync`).
+
+### Mandatory Workflow:
+
+**BEFORE starting any task:**
+1. Always fetch the latest version first:
+   - Windows: `powershell -File fetch-knowledge.ps1`
+   - Mac/Linux: `./fetch-knowledge.sh`
+2. Read `.knowledge/MEME_CAPSULE_KNOWLEDGE.md` fully before writing any code or changing configuration.
+
+**AFTER any meaningful change:**
+(new feature, architecture decision, bug fix, workflow change, new dependency, table migration):
+1. Update `.knowledge/MEME_CAPSULE_KNOWLEDGE.md` with the new relevant notes.
+2. Push the updated knowledge file back to the shared repository:
+   - Windows: `powershell -File update-knowledge.ps1`
+   - Mac/Linux: `./update-knowledge.sh`
+3. If a **CONFLICT** is reported — stop, run `fetch-knowledge.ps1` fresh, manually merge your new notes into the fresh file, then run `update-knowledge.ps1` again. Never force-push or skip the fetch before pushing.
