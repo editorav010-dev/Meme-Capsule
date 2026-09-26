@@ -6,9 +6,23 @@ A high-performance, minimalist curated meme platform built with **Vite + React +
 
 ## Development Team & Engineering Division
 
-Meme Capsule is a collaborative project developed by **Anmol Verma** and **Pratham Pandey**:
-- **Anmol Verma** ([@editorav010-dev](https://github.com/editorav010-dev) — `anmolverma.env@gmail.com`): Lead Developer — Full backend engineering, backend architecture, core algorithms, application logic and workflows, and backend systems implementation.
-- **Pratham Pandey** (`bbethical010@gmail.com`): Frontend landing pages, APK/application-side development, API call integrations, and related frontend setup.
+Meme Capsule is a collaborative project developed by three individuals with distinct and complementary ownership areas:
+
+- **Anmol Verma** (Lead Backend Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`):
+  Full backend engineering, Cloudflare serverless architecture, core algorithms, AI tools implementation, security, curation pipelines, and all internal backend workbenches (/admin, /curate, /reports, /ai-judge).
+
+- **Pratham Pandey** (Lead Frontend Developer & Original Ideator — GitHub: [`bbethical010-glitch`](https://github.com/bbethical010-glitch), Email: `bbethical010@gmail.com`):
+  Original concept and founding idea behind Meme Capsule. Leads frontend landing pages, Android APK development (com.meme.capsule), app theme and typography, UI/UX, Java Android bridge, MediaStore integrations, and consumer-facing client setup.
+
+- **Faraz Ahmed** (Social Media & Marketing Lead — Email: `thesplashsnize@gmail.com`):
+  Manages all official social media handles, content planning, niche analysis, scripting, quality control, and marketing campaigns.
+
+**Official App Email (User Support & Marketing):** `memecapsule.app@gmail.com`
+
+**Official Social Media:**
+- Instagram: https://www.instagram.com/capsule.meme/
+- X: https://x.com/memecapsule_
+- Threads: https://www.threads.com/@capsule.meme
 
 ## Ecosystem Overview: Public Product vs. Internal Systems
 

@@ -106,7 +106,7 @@ If a test, build, or command fails:
 > **CRITICAL RULE:** Documentation is a first-class deliverable. Every AI coding agent **MUST** keep all affected Markdown documentation files completely synchronized and accurate after **every change, feature addition, refactoring, or bugfix** in the codebase. Never leave a task marked complete without updating the documentation.
 
 ### The Canonical Documentation Inventory to Keep Updated:
-1. **`docs/MEME_CAPSULE_APP_KNOWLEDGE.md`**: Master architectural & product knowledge reference. Update whenever features, concepts, workflows, or ecosystem responsibilities change.
+1. **`docs/MEME_CAPSULE_KNOWLEDGE.md`**: Master architectural & product knowledge reference. Update whenever features, concepts, workflows, or ecosystem responsibilities change.
 2. **`docs/PRIVACY_COOKIES_AND_DATA_FLOWS.md`**: Telemetry, cookies, analytics, subprocessors, and privacy compliance. Update whenever new third-party services, forms, cookies, SDKs, or data pipelines are modified.
 3. **`docs/DATABASE.md`**: Cloudflare D1 SQLite schemas, table migrations, column structures, and R2 media bucket configurations.
 4. **`docs/PROJECT_STRUCTURE.md`**: Directory maps, file layouts, component boundaries, and dependency mappings.
@@ -160,3 +160,18 @@ It is NOT part of this repository — it syncs via a separate GitHub repository 
    - Windows: `powershell -File update-knowledge.ps1`
    - Mac/Linux: `./update-knowledge.sh`
 3. If a **CONFLICT** is reported — stop, run `fetch-knowledge.ps1` fresh, manually merge your new notes into the fresh file, then run `update-knowledge.ps1` again. Never force-push or skip the fetch before pushing.
+
+---
+
+## 10. Canonical Project Team & Ownership Division
+
+All agents must respect and accurately attribute project ownership:
+- **Anmol Verma** (Lead Backend Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`): Full backend engineering, serverless architecture, core algorithms, AI tools implementation, security, curation systems, and all internal backend workbenches.
+- **Pratham Pandey** (Lead Frontend Developer & Original Ideator — GitHub: [`bbethical010-glitch`](https://github.com/bbethical010-glitch), Email: `bbethical010@gmail.com`): Original concept and founding idea, frontend landing pages, Android APK development (`com.meme.capsule`), app theme, typography, UI/UX, Java Android bridge, and client integrations.
+- **Faraz Ahmed** (Social Media & Marketing Lead — Email: `thesplashsnize@gmail.com`): Social media handles management, content planning, niche analysis, scripting, and marketing campaigns.
+
+**Official App Email (User Support & Marketing):** `memecapsule.app@gmail.com`  
+**Official Social Media:**  
+- Instagram: https://www.instagram.com/capsule.meme/  
+- X: https://x.com/memecapsule_  
+- Threads: https://www.threads.com/@capsule.meme

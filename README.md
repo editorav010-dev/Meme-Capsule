@@ -14,7 +14,14 @@ All project documentation and resources have been moved to the dedicated `docs/`
 
 ---
 
-**Development Team:** Developed collaboratively by **Anmol Verma** (Lead Developer — Backend Architecture, Core Algorithms & Systems) and **Pratham Pandey** (Frontend Landing Pages, Mobile APK & Integrations).
+**Development Team:** Developed collaboratively by **Anmol Verma** (Lead Backend Developer — Backend Architecture, Core Algorithms, AI Tools & Systems), **Pratham Pandey** (Lead Frontend Developer & Original Ideator — Founding Concept, APK, Web Platform & UI/UX), and **Faraz Ahmed** (Social Media & Marketing Lead).
+
+**Official App Email (User Support & Marketing):** `memecapsule.app@gmail.com`
+
+**Official Social Media:**
+- Instagram: https://www.instagram.com/capsule.meme/
+- X: https://x.com/memecapsule_
+- Threads: https://www.threads.com/@capsule.meme
 
 ---
 *Note: Do not delete the root-level `CLAUDE.md` as it is required by IDE agents for task execution.*

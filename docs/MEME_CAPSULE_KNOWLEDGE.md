@@ -8,9 +8,13 @@
 > **Mobile App Version:** `v2.7` (`versionCode 18`) — Production on Google Play  
 > **Official Web Platform:** [https://memecapsule.wtf](https://memecapsule.wtf) (Vite / React Multi-Page Static Prerendered)  
 > **Serverless Edge Backend:** [https://meme-capsule-eww.pages.dev](https://meme-capsule-eww.pages.dev) (Cloudflare Pages, D1 SQLite, R2 CDN)  
-> **Project Developers & Engineering Leadership:**  
-> - **Anmol Verma** (`editorav010-dev` / `anmolverma.env@gmail.com`): Lead Developer — Full Backend Engineering, Backend Architecture, Core Algorithms, Application Logic & Workflows, Systems Implementation  
-> - **Pratham Pandey** (`bbethical010@gmail.com` / `memecapsule.app@gmail.com`): Frontend Landing Pages, Mobile APK Development, API Integrations, and Client Setup  
+> **Project Team & Engineering Leadership:**  
+> - **Anmol Verma** (`editorav010-dev` / `anmolverma.env@gmail.com`): Lead Backend Developer — Full backend engineering, serverless architecture, core algorithms, AI tools implementation, security, curation systems, and all internal backend workbenches.  
+> - **Pratham Pandey** (`bbethical010-glitch` / `bbethical010@gmail.com`): Lead Frontend Developer & Original Ideator — Founding concept, frontend landing pages, Android APK development, app theme, typography, UI/UX, Java Android bridge, and client-side integrations.  
+> - **Faraz Ahmed** (`thesplashsnize@gmail.com`): Social Media & Marketing Lead — Social media management, content planning, niche analysis, scripting, and marketing campaigns.  
+> **Official App Email (User Support & Marketing):** `memecapsule.app@gmail.com`  
+> **Official Social Media:**  
+> Instagram: https://www.instagram.com/capsule.meme/ | X: https://x.com/memecapsule_ | Threads: https://www.threads.com/@capsule.meme  
 > **Last Master Synchronization:** September 26, 2026  
 
 ---
@@ -173,20 +177,39 @@ Any meme that is unfinalized, in judging, or excluded is mathematically impossib
 
 ### 2.1 Collaborative Development & Engineering Division
 
-Meme Capsule is a collaborative project developed by **Anmol Verma** and **Pratham Pandey**, with clear architectural and operational division of responsibilities:
+Meme Capsule is a three-person collaborative project with a clear division of architectural, consumer-facing, and marketing responsibilities:
 
-- **Anmol Verma** (Lead Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`):
+- **Anmol Verma** (Lead Backend Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`):
   - Full backend engineering & Cloudflare Pages Functions serverless architecture
   - Backend architecture and systems implementation
-  - Core algorithms (randomization, deduplication, 3-tier curation status partitioning, edge ranking)
+  - Core algorithms: randomization, deduplication, 3-tier curation status partitioning, and edge ranking
   - Application logic, workflows, multi-judge consensus, and SuperAdmin arbitration systems
+  - AI tools implementation: Gemini Vision pipeline and NVIDIA NIM Llama 3.2 Vision pre-curation runner
+  - Security, privacy architecture, token-gated auth, and SHA-256 session management
+  - Admin, SuperAdmin, and all internal backend workbenches (/admin, /curate, /categorise, /reports, /ai-judge)
   - The underlying technical and mathematical logic behind the Meme Capsule delivery engine
 
-- **Pratham Pandey** (Email: `bbethical010@gmail.com` / `memecapsule.app@gmail.com`):
-  - Frontend landing pages and promotional web platform ([memecapsule.wtf](https://memecapsule.wtf))
-  - Public Android mobile application development (`com.meme.capsule` via Capacitor 8, React 19, Tailwind v4)
-  - Client-side API call integrations, Java Android bridge (`MainActivity.java`), and MediaStore integrations
-  - Related frontend UI/UX engineering, animations, and client build setup
+- **Pratham Pandey** (Lead Frontend Developer & Original Ideator — GitHub: [`bbethical010-glitch`](https://github.com/bbethical010-glitch), Email: `bbethical010@gmail.com`):
+  - **Original concept, initial vision, and founding idea behind Meme Capsule**
+  - Frontend landing pages and promotional web platform (memecapsule.wtf)
+  - Public Android mobile application development (`com.meme.capsule` via Capacitor 8, React 19, Tailwind CSS v4)
+  - App theme, typography, visual identity, and implementing new UI/UX elements across consumer-facing surfaces
+  - Client-side API call integrations and frontend request handling
+  - Java Android bridge (`MainActivity.java`) and Android MediaStore integrations
+  - Consumer-facing frontend engineering, animations, and client build setup
+
+- **Faraz Ahmed** (Social Media & Marketing Lead — Email: `thesplashsnize@gmail.com`):
+  - Management of all official Meme Capsule social media handles
+  - Content planning, niche analysis, and editorial quality control of all social content
+  - Scripting, brand voice, and campaign copywriting
+  - Marketing strategy, audience growth, and platform-specific distribution
+  - **Official Handles Managed:**
+    - Instagram: https://www.instagram.com/capsule.meme/
+    - X: https://x.com/memecapsule_
+    - Threads: https://www.threads.com/@capsule.meme
+
+**Official App Email (User Support & Marketing):** `memecapsule.app@gmail.com`  
+*(This is the app's public-facing contact email — not a personal developer address.)*
 
 ### 2.2 The Three Decoupled Codebases
 
@@ -383,7 +406,7 @@ Located in `src/components/HowItWorksDetail.tsx`:
 ### 4.9 Search, Generative & AI Engine Optimization (SEO, GEO & AEO)
 1. **Schema.org Structured Data (JSON-LD):**
    - `WebSite` (`@id: #website`): Canonical entity and search action.
-   - `Organization` (`@id: #organization`): Developed collaboratively by Anmol Verma (Lead Backend Architecture & Logic) and Pratham Pandey (Frontend & APK Development), with verified links to GitHub and Google Play.
+   - `Organization` (`@id: #organization`): Developed collaboratively by Anmol Verma (Lead Backend Developer — backend architecture, algorithms, AI, security & curation systems), Pratham Pandey (Lead Frontend Developer & Original Ideator — founding concept, APK, web platform & UI/UX), and Faraz Ahmed (Social Media & Marketing Lead).
    - `MobileApplication` (`@id: #app`): Directly links to Google Play package `com.meme.capsule`, rating, price ($0), and Android OS.
    - `FAQPage`: Formats all 15 FAQ questions into Google SERP rich snippet accordions.
 2. **Generative Engine Optimization (GEO):**
@@ -665,8 +688,17 @@ PACKAGE ID: com.meme.capsule
 CURRENT ANDROID VERSION: v2.7 (versionCode 18)
 OFFICIAL WEBSITES: https://memecapsule.wtf (Web Platform) | https://meme-capsule-eww.pages.dev (Edge Backend)
 DEVELOPERS & LEADERSHIP:
-- Anmol Verma (anmolverma.env@gmail.com / GitHub: editorav010-dev) — Lead Developer: Full backend engineering, backend architecture, core algorithms, application logic & workflows, systems implementation.
-- Pratham Pandey (bbethical010@gmail.com / memecapsule.app@gmail.com) — Frontend landing pages, APK/application-side development, API call integrations, client setup.
+- Anmol Verma (anmolverma.env@gmail.com / GitHub: editorav010-dev)
+  Lead Backend Developer: Full backend engineering, serverless architecture, core algorithms, AI tools, security, curation, and all admin systems.
+- Pratham Pandey (bbethical010@gmail.com / GitHub: bbethical010-glitch)
+  Lead Frontend Developer & Original Ideator: Founding concept, APK, web platform (memecapsule.wtf), app theme, typography, UI/UX, Java Android bridge, MediaStore integrations, client build setup.
+- Faraz Ahmed (thesplashsnize@gmail.com)
+  Social Media & Marketing Lead: Social handles, content planning, niche analysis, scripting, quality control, and marketing campaigns.
+Official App Email (User Support & Marketing): memecapsule.app@gmail.com
+Social Media:
+  Instagram: https://www.instagram.com/capsule.meme/
+  X: https://x.com/memecapsule_
+  Threads: https://www.threads.com/@capsule.meme
 
 ECOSYSTEM STRUCTURE:
 1. PUBLIC MOBILE APP (com.meme.capsule):

@@ -3,7 +3,7 @@
 > **CRITICAL**: All AI coding agents must read and adhere to [`AGENT_RULES.md`](./AGENT_RULES.md) before making changes.
 
 ## Project Overview
-**Meme Capsule** is an anti-algorithm meme discovery platform developed collaboratively by **Anmol Verma** ([@editorav010-dev](https://github.com/editorav010-dev) / `anmolverma.env@gmail.com`) as Lead Developer (Full backend engineering, backend architecture, core algorithms, application logic & workflows, systems implementation) and **Pratham Pandey** (`bbethical010@gmail.com`) (Frontend landing pages, APK/application-side development, API call integrations, client setup).
+**Meme Capsule** is an anti-algorithm meme discovery platform developed collaboratively by **Anmol Verma** ([@editorav010-dev](https://github.com/editorav010-dev) / `anmolverma.env@gmail.com`) as Lead Backend Developer, **Pratham Pandey** ([@bbethical010-glitch](https://github.com/bbethical010-glitch) / `bbethical010@gmail.com`) as Lead Frontend Developer & Original Ideator, and **Faraz Ahmed** (`thesplashsnize@gmail.com`) as Social Media & Marketing Lead. Official App Contact: `memecapsule.app@gmail.com`.
 
 The public end-user mobile experience (Android APK `com.meme.capsule` and promotional web landing `https://memecapsule.wtf/`) is maintained in a companion mobile repository.
 
