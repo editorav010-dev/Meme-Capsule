@@ -4,6 +4,12 @@ A high-performance, minimalist curated meme platform built with **Vite + React +
 
 **GitHub Repo:** [https://github.com/editorav010-dev/Meme-Capsule](https://github.com/editorav010-dev/Meme-Capsule)
 
+## Development Team & Engineering Division
+
+Meme Capsule is a collaborative project developed by **Anmol Verma** and **Pratham Pandey**:
+- **Anmol Verma** ([@editorav010-dev](https://github.com/editorav010-dev) — `anmolverma.env@gmail.com`): Lead Developer — Full backend engineering, backend architecture, core algorithms, application logic and workflows, and backend systems implementation.
+- **Pratham Pandey** (`bbethical010@gmail.com`): Frontend landing pages, APK/application-side development, API call integrations, and related frontend setup.
+
 ## Ecosystem Overview: Public Product vs. Internal Systems
 
 Meme Capsule operates across two distinct codebases:
@@ -12,7 +18,7 @@ Meme Capsule operates across two distinct codebases:
 
 ## Core Documentation Index
 
-- [`docs/MEME_CAPSULE_APP_KNOWLEDGE.md`](./MEME_CAPSULE_APP_KNOWLEDGE.md) — Master product & technical specification, core product FAQs, and system architecture.
+- [`docs/MEME_CAPSULE_KNOWLEDGE.md`](./MEME_CAPSULE_KNOWLEDGE.md) — Master product & technical specification, core product FAQs, and system architecture.
 - [`docs/PRIVACY_COOKIES_AND_DATA_FLOWS.md`](./PRIVACY_COOKIES_AND_DATA_FLOWS.md) — Exhaustive audit of website cookies, Formspree contact form, GA4 telemetry, AdMob integration, and Google Play Data Safety declarations.
 - [`docs/DATABASE.md`](./DATABASE.md) — Cloudflare D1 SQLite database schemas, migrations, and R2 media bucket architecture.
 - [`docs/PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) — Detailed directory mapping, route mappings, and component hierarchy.

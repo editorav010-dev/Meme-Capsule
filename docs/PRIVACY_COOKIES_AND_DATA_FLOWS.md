@@ -6,6 +6,7 @@
 > **Android Package Identifier:** `com.meme.capsule`  
 > **Public Web Presence:** [https://memecapsule.wtf/](https://memecapsule.wtf/)  
 > **Serverless API Base:** [https://meme-capsule-eww.pages.dev](https://meme-capsule-eww.pages.dev)  
+> **Project Developers:** Anmol Verma (Lead Backend Engineering & Systems Architecture) & Pratham Pandey (Frontend, Mobile APK & Client Integration)  
 > **Last Verified:** September 2026  
 > **Status:** Production Reference  
 
@@ -76,7 +77,7 @@ The landing site features a contact and support form in Section `07 — GET IN T
 - **Service Provider:** [Formspree Inc.](https://formspree.io)
 - **Endpoint URL:** `https://formspree.io/f/xwlenwzr`
 - **Form Action:** Direct HTTP `POST` submission.
-- **Target Recipient:** Developer inbox (`bbethical010@gmail.com`).
+- **Target Recipient:** Web & support inbox (`bbethical010@gmail.com` — Pratham Pandey). For backend & architecture privacy inquiries: `anmolverma.env@gmail.com` (Anmol Verma).
 - **Data Collected:**
   1. `name` (*Required, text*): Name provided by the user.
   2. `email` (*Required, email*): Return email address for responses.

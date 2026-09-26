@@ -3,7 +3,9 @@
 > **CRITICAL**: All AI coding agents must read and adhere to [`AGENT_RULES.md`](./AGENT_RULES.md) before making changes.
 
 ## Project Overview
-**Meme Capsule** is an anti-algorithm meme discovery platform. The public end-user mobile experience (Android APK `com.meme.capsule` and promotional web landing `https://memecapsule.wtf/`) is maintained in a companion mobile repository.
+**Meme Capsule** is an anti-algorithm meme discovery platform developed collaboratively by **Anmol Verma** ([@editorav010-dev](https://github.com/editorav010-dev) / `anmolverma.env@gmail.com`) as Lead Developer (Full backend engineering, backend architecture, core algorithms, application logic & workflows, systems implementation) and **Pratham Pandey** (`bbethical010@gmail.com`) (Frontend landing pages, APK/application-side development, API call integrations, client setup).
+
+The public end-user mobile experience (Android APK `com.meme.capsule` and promotional web landing `https://memecapsule.wtf/`) is maintained in a companion mobile repository.
 
 **This repository** serves as the **Serverless Edge Backend, Curation Engine, Moderation Hub, and Administration Portal** deployed on Cloudflare Pages (`https://meme-capsule-eww.pages.dev`). The discontinued legacy root landing UI (`App.tsx`, `styles.css`) has been removed; the default root `/` and hash routes serve the internal Neo-Brutalist tool suites.
 

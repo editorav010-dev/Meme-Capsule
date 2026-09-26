@@ -8,8 +8,10 @@
 > **Mobile App Version:** `v2.7` (`versionCode 18`) — Production on Google Play  
 > **Official Web Platform:** [https://memecapsule.wtf](https://memecapsule.wtf) (Vite / React Multi-Page Static Prerendered)  
 > **Serverless Edge Backend:** [https://meme-capsule-eww.pages.dev](https://meme-capsule-eww.pages.dev) (Cloudflare Pages, D1 SQLite, R2 CDN)  
-> **Developer & Lead Engineer:** Pratham Pandey (`memecapsule.app@gmail.com` / `bbethical010@gmail.com`)  
-> **Last Master Synchronization:** September 25, 2026  
+> **Project Developers & Engineering Leadership:**  
+> - **Anmol Verma** (`editorav010-dev` / `anmolverma.env@gmail.com`): Lead Developer — Full Backend Engineering, Backend Architecture, Core Algorithms, Application Logic & Workflows, Systems Implementation  
+> - **Pratham Pandey** (`bbethical010@gmail.com` / `memecapsule.app@gmail.com`): Frontend Landing Pages, Mobile APK Development, API Integrations, and Client Setup  
+> **Last Master Synchronization:** September 26, 2026  
 
 ---
 
@@ -17,6 +19,8 @@
 
 1. [Meme Capsule — Core Product Questions (Stand-Alone FAQ)](#1-meme-capsule--core-product-questions-stand-alone-faq)
 2. [Executive System Summary: Three Distinct Codebases](#2-executive-system-summary-three-distinct-codebases)
+   - 2.1 [Collaborative Development & Engineering Division](#21-collaborative-development--engineering-division)
+   - 2.2 [The Three Decoupled Codebases](#22-the-three-decoupled-codebases)
 3. [PART A: PUBLIC MOBILE APPLICATION (`com.meme.capsule`)](#3-part-a-public-mobile-application-commemecapsule)
    - 3.1 [Product Identity, Philosophy & Vision](#31-product-identity-philosophy--vision)
    - 3.2 [Target Users, Personas & Core Scenarios](#32-target-users-personas--core-scenarios)
@@ -167,6 +171,25 @@ Any meme that is unfinalized, in judging, or excluded is mathematically impossib
 
 ## 2. EXECUTIVE SYSTEM SUMMARY: THREE DISTINCT CODEBASES
 
+### 2.1 Collaborative Development & Engineering Division
+
+Meme Capsule is a collaborative project developed by **Anmol Verma** and **Pratham Pandey**, with clear architectural and operational division of responsibilities:
+
+- **Anmol Verma** (Lead Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`):
+  - Full backend engineering & Cloudflare Pages Functions serverless architecture
+  - Backend architecture and systems implementation
+  - Core algorithms (randomization, deduplication, 3-tier curation status partitioning, edge ranking)
+  - Application logic, workflows, multi-judge consensus, and SuperAdmin arbitration systems
+  - The underlying technical and mathematical logic behind the Meme Capsule delivery engine
+
+- **Pratham Pandey** (Email: `bbethical010@gmail.com` / `memecapsule.app@gmail.com`):
+  - Frontend landing pages and promotional web platform ([memecapsule.wtf](https://memecapsule.wtf))
+  - Public Android mobile application development (`com.meme.capsule` via Capacitor 8, React 19, Tailwind v4)
+  - Client-side API call integrations, Java Android bridge (`MainActivity.java`), and MediaStore integrations
+  - Related frontend UI/UX engineering, animations, and client build setup
+
+### 2.2 The Three Decoupled Codebases
+
 The Meme Capsule engineering ecosystem is organized into **three distinct, decoupled codebases**:
 
 ```
@@ -220,7 +243,7 @@ The mobile app rejects infinite feed algorithms. It is designed as an **Arcade V
 
 | Feature Category | Feature | Implementation Component | Technical Description & Behavior |
 | :--- | :--- | :--- | :--- |
-| **Core Dispenser** | **Hero Landing (`HIT ME`)** | `src/App.tsx` | Dominant Neo-Brutalist `HIT ME` button with pulsing glow aura, compact secondary actions (`BONUS DROP` & `TRIPLE DROP`), and header Streak & Privacy badges. |
+| **Core Dispenser** | **Hero Landing (`HIT ME`)** | `src/App.tsx` | Dominant Neo-Brutalist `HIT ME` button with pulsing glow aura, compact secondary actions (`BONUS DROP` & `TRIPLE DROP`), and header Streak & Settings shortcut badges. |
 | **Feed Pipeline** | **7-Meme FIFO Prefetch Buffer** | `src/App.tsx` | Maintains an in-memory queue of 7 preloaded memes (`PIPELINE_TARGET_SIZE = 7`) for instant card swiping with zero delay. |
 | **Feed Sourcing** | **Hybrid D1/R2 + SFW Reddit** | `src/App.tsx` | Fetches curated memes from Cloudflare D1/R2 (`/api/random-meme`) and alternates every 3rd fetch (`totalMemesViewed % 3 === 0`) with Reddit (`meme-api.com/gimme`), strictly dropping NSFW and spoilers. |
 | **Card Deck** | **4-Card 3D Perspective Stack** | `src/components/MemeStack.tsx` & `MemeCard.tsx` | Spring-physics 4-card stack powered by `@react-spring/web` and `@use-gesture/react`. Supports Swipe Right (`keep`), Swipe Left (`skip`), Swipe Up (`save`), Double-Tap (`DANK!` shake), and Long-Press (600ms gallery download). |
@@ -231,6 +254,7 @@ The mobile app rejects infinite feed algorithms. It is designed as an **Arcade V
 | **Targeted Sharing** | **Direct Social Intent Bridge** | `MainActivity.java` | `shareImageToApp()` targets specific package names (WhatsApp, Instagram, Facebook, X, Telegram, Discord) with automatic fallback to `Intent.createChooser`. |
 | **Collections** | **Meme Vault (Favorites)** | `src/App.tsx` | Searchable local gallery of saved memes with viewed/fetched/liked counters. Free tier limit: 20 memes (`FREE_VAULT_LIMIT = 20`); Pro tier: unlimited. |
 | **Themed Binders** | **Mood Boards ("Pinned Energy")** | `src/App.tsx`, `CreateBoardModal.tsx`, `UnpinModal.tsx` | Custom color-coded mood boards (`primary`, `secondary`, `tertiary`) with synchronized `meme_pinboard` + `meme_favorites` storage for reliable thumbnail rendering. |
+| **Settings & Privacy** | **Settings & History Erasure Page** | `src/App.tsx` (`activeTab === 'settings'`) | 4th bottom navigation tab & header gear shortcut consolidating **Privacy Policy (v1.1)** (removed from the face of Home/Vault/Mood Boards), **Local Device Footprint KPIs**, **Clear Past Viewing History & Stats**, **Empty Vault & Mood Boards**, **Unblock Reported Memes**, **Delete All App History & Data** (with 2-step confirmation), **Capsule Feed Toggles** (Hybrid Reddit Relay, 7-Meme Turbo Buffer, Card Shake Effects), **Pro Upgrade/Restore**, and **Replay Gesture Tour**. |
 | **Safety & UGC** | **Content Reporting & Blocklist** | `src/ReportModal.tsx` & `src/App.tsx` | Store-compliant reporting modal (`POST /api/report`). Reported memes are written to `localStorage('reported_memes')` and permanently filtered out of rotation. |
 | **Monetization** | **AdMob + In-App Purchase (PRO)** | `src/ProUpgradeModal.tsx` & `src/App.tsx` | Interstitial ads every 4th meme + Rewarded ads for bonus drops (`@capacitor-community/admob`). One-time Pro upgrade (`remove_ads_forever` via `@capgo/native-purchases`) unlocks Zero Ads, Unlimited Vault, and permanent Triple Drop. |
 
@@ -359,7 +383,7 @@ Located in `src/components/HowItWorksDetail.tsx`:
 ### 4.9 Search, Generative & AI Engine Optimization (SEO, GEO & AEO)
 1. **Schema.org Structured Data (JSON-LD):**
    - `WebSite` (`@id: #website`): Canonical entity and search action.
-   - `Organization` (`@id: #organization`): Developer Pratham Pandey, verified links to GitHub and Google Play.
+   - `Organization` (`@id: #organization`): Developed collaboratively by Anmol Verma (Lead Backend Architecture & Logic) and Pratham Pandey (Frontend & APK Development), with verified links to GitHub and Google Play.
    - `MobileApplication` (`@id: #app`): Directly links to Google Play package `com.meme.capsule`, rating, price ($0), and Android OS.
    - `FAQPage`: Formats all 15 FAQ questions into Google SERP rich snippet accordions.
 2. **Generative Engine Optimization (GEO):**
@@ -531,6 +555,7 @@ All three codebases share a unified **Neo-Brutalist Cyber-Arcade** design langua
 | **Mobile App (APK)** | Scoped MediaStore Native Java Bridge | `[IMPLEMENTED]` | `MainActivity.java` (`Pictures/Meme Capsule`) |
 | **Mobile App (APK)** | Targeted Social Share Intent Bridge | `[IMPLEMENTED]` | `MainActivity.java` (`shareImageToApp`) |
 | **Mobile App (APK)** | Meme Vault (Favorites) & Mood Boards | `[IMPLEMENTED]` | `src/App.tsx`, `CreateBoardModal.tsx`, `UnpinModal.tsx` |
+| **Mobile App (APK)** | Settings, Privacy & History Erasure Page| `[IMPLEMENTED]` | `src/App.tsx` (`activeTab === 'settings'`, full history wipe) |
 | **Mobile App (APK)** | AdMob Interstitials & Rewarded Drops | `[IMPLEMENTED]` | `@capacitor-community/admob` |
 | **Mobile App (APK)** | In-App Purchases (Pro Tier ₹99) | `[IMPLEMENTED]` | `@capgo/native-purchases` (`remove_ads_forever`) |
 | **Mobile App (APK)** | UGC Reporting & Local Blocklist | `[IMPLEMENTED]` | `ReportModal.tsx` + `localStorage('reported_memes')` |
@@ -639,7 +664,9 @@ APP NAME: Meme Capsule
 PACKAGE ID: com.meme.capsule
 CURRENT ANDROID VERSION: v2.7 (versionCode 18)
 OFFICIAL WEBSITES: https://memecapsule.wtf (Web Platform) | https://meme-capsule-eww.pages.dev (Edge Backend)
-DEVELOPER: Pratham Pandey (memecapsule.app@gmail.com)
+DEVELOPERS & LEADERSHIP:
+- Anmol Verma (anmolverma.env@gmail.com / GitHub: editorav010-dev) — Lead Developer: Full backend engineering, backend architecture, core algorithms, application logic & workflows, systems implementation.
+- Pratham Pandey (bbethical010@gmail.com / memecapsule.app@gmail.com) — Frontend landing pages, APK/application-side development, API call integrations, client setup.
 
 ECOSYSTEM STRUCTURE:
 1. PUBLIC MOBILE APP (com.meme.capsule):
@@ -647,7 +674,7 @@ ECOSYSTEM STRUCTURE:
    - Core UX: 4-card 3D perspective spring deck (@react-spring/web, @use-gesture/react), 7-meme FIFO prefetch buffer, instant-touch 38x38 overlay buttons (onPointerDown with debounce), 4-button CTA bar (LIKE, VAULT, PIN, SHARE).
    - Viral Sharing: Neo-Brutalist Share Sheet with live thumbnail preview, auto-attached Play Store link, 6 animated social media SVGs (WhatsApp, Instagram, Facebook, X, Telegram, Discord), QuickShare, More Options (#FF8C00 native chooser).
    - Native Java: MainActivity.java injects "window.MemeCapsuleAndroid" for Scoped MediaStore gallery saving (Pictures/Meme Capsule) and targeted intent sharing (shareImageToApp).
-   - Collections & Monetization: Meme Vault (free limit 20, Pro unlimited), Mood Boards, AdMob interstitials (every 4th drop), In-App Purchase (₹99 remove_ads_forever).
+   - Collections, Settings & Monetization: Meme Vault (free limit 20, Pro unlimited), Mood Boards, dedicated 4th Settings & Privacy tab (consolidating Privacy Policy v1.1, full history/data erasure, and feed/buffer/shake toggles), AdMob interstitials (every 4th drop), In-App Purchase (₹99 remove_ads_forever).
 
 2. PUBLIC WEB PLATFORM (memecapsule.wtf):
    - Tech: React 18, Vite 5, Tailwind CSS v3, React Router DOM v6, static HTML prerendering (vite-plugin-prerender with ReactSSRRenderer) on GitHub Pages.
@@ -674,8 +701,3 @@ CRITICAL RULES & CONSTRAINTS:
 4. CLEAR CODEBASE BOUNDARIES: Maintain strict separation between Mobile APK, Promo Web, and Edge Backend.
 =========================================================
 ```
-
-Added by Person A on [today's date] — testing the sync workflow.
-
-
-chal gaya bhenchod finally

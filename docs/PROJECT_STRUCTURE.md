@@ -6,6 +6,8 @@ Meme Capsule is a minimalist curated meme PWA built with Vite + React + TypeScri
 
 **Source Code:** [https://github.com/editorav010-dev/Meme-Capsule](https://github.com/editorav010-dev/Meme-Capsule)
 
+**Development Team:** Developed collaboratively by **Anmol Verma** (Lead Developer — Backend Architecture, Core Algorithms & Systems) and **Pratham Pandey** (Frontend Landing Pages, Mobile APK & Integrations).
+
 ## Directory Map
 
 <!-- DIRECTORY_MAP_START -->
@@ -23,7 +25,7 @@ meme application/
 │   ├── CHANGELOG.md                                  # Version history
 │   ├── CLAUDE.md                                     # Development setup & commands guide
 │   ├── DATABASE.md                                   # Database and storage architecture docs
-│   ├── MEME_CAPSULE_APP_KNOWLEDGE.md                 # Master canonical product & architecture spec
+│   ├── MEME_CAPSULE_KNOWLEDGE.md                     # Master canonical product & architecture spec
 │   ├── PRIVACY_COOKIES_AND_DATA_FLOWS.md             # Privacy, cookies, Formspree, AdMob audit
 │   ├── PROJECT_STRUCTURE.md                          # This file
 │   ├── README_ANALYTICS.md                           # Analytics tracking SDK, ingestion & aggregation
