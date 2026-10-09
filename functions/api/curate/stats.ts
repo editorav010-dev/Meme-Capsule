@@ -52,17 +52,32 @@ interface CurationRow {
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   try {
-    // 1. Overall Corpus Counts
-    const totalCountRes = await env.DB.prepare(
-      "SELECT COUNT(*) as cnt FROM memes"
-    ).first<{ cnt: number }>();
-    const total = totalCountRes?.cnt ?? 0;
+    // 1. Overall Corpus Counts (excluding force-removed memes)
+    let total = 0;
+    try {
+      const totalCountRes = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM memes WHERE id NOT IN (SELECT meme_id FROM meme_force_removals)"
+      ).first<{ cnt: number }>();
+      total = totalCountRes?.cnt ?? 0;
+    } catch {
+      const totalCountRes = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM memes"
+      ).first<{ cnt: number }>();
+      total = totalCountRes?.cnt ?? 0;
+    }
 
-    const { results } = await env.DB.prepare(
-      "SELECT corpus_status, topics, tone, humour_mechanisms FROM meme_curation"
-    ).all<CurationRow>();
-
-    const rows = results || [];
+    let rows: CurationRow[] = [];
+    try {
+      const { results } = await env.DB.prepare(
+        "SELECT corpus_status, topics, tone, humour_mechanisms FROM meme_curation WHERE meme_id NOT IN (SELECT meme_id FROM meme_force_removals)"
+      ).all<CurationRow>();
+      rows = results || [];
+    } catch {
+      const { results } = await env.DB.prepare(
+        "SELECT corpus_status, topics, tone, humour_mechanisms FROM meme_curation"
+      ).all<CurationRow>();
+      rows = results || [];
+    }
     const reviewed = rows.length;
     const remaining = Math.max(0, total - reviewed);
 

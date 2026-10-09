@@ -194,3 +194,42 @@ export async function ensureAIPredictionTable(db: D1Database): Promise<void> {
     console.error("Warning: could not auto-initialize ai prediction table:", err);
   }
 }
+
+let forceRemovalsTableInitialized = false;
+
+export async function ensureForceRemovalsTable(db: D1Database): Promise<void> {
+  if (forceRemovalsTableInitialized) return;
+
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS meme_force_removals (
+        id              TEXT PRIMARY KEY DEFAULT ('frm-' || hex(randomblob(6))),
+        meme_id         TEXT NOT NULL UNIQUE,
+        title           TEXT,
+        image_url       TEXT,
+        storage_path    TEXT,
+        r2_key          TEXT,
+        removed_by      TEXT NOT NULL,
+        removed_by_name TEXT,
+        reason          TEXT,
+        r2_deleted      INTEGER NOT NULL DEFAULT 0,
+        r2_error        TEXT,
+        removed_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        r2_deleted_at   TEXT,
+        FOREIGN KEY (meme_id) REFERENCES memes(id),
+        FOREIGN KEY (removed_by) REFERENCES cat_users(id)
+      )
+    `).run();
+
+    try {
+      await db.prepare("CREATE INDEX IF NOT EXISTS idx_force_removals_meme_id ON meme_force_removals(meme_id)").run();
+    } catch {
+      // ignore
+    }
+
+    forceRemovalsTableInitialized = true;
+  } catch (err) {
+    console.error("Warning: could not auto-initialize force removals table:", err);
+  }
+}
+

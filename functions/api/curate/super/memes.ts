@@ -55,7 +55,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     let baseQuery = `
       FROM memes m
       LEFT JOIN meme_curation_final f ON m.id = f.meme_id
-      WHERE 1=1
+      WHERE m.id NOT IN (SELECT meme_id FROM meme_force_removals)
     `;
     const params: (string | number)[] = [];
 
