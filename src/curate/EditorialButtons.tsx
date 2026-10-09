@@ -6,13 +6,17 @@ interface EditorialButtonsProps {
   duplicateOf: string;
   onSelectStatus: (status: CorpusStatus) => void;
   onChangeDuplicateOf: (id: string) => void;
+  onForceRemove?: () => void;
+  forceRemoveLoading?: boolean;
 }
 
 export default function EditorialButtons({
   currentStatus,
   duplicateOf,
   onSelectStatus,
-  onChangeDuplicateOf
+  onChangeDuplicateOf,
+  onForceRemove,
+  forceRemoveLoading
 }: EditorialButtonsProps) {
   return (
     <div>
@@ -94,6 +98,41 @@ export default function EditorialButtons({
           <span style={{ fontSize: "10px", opacity: 0.8 }}>Defer Queue</span>
         </button>
       </div>
+
+      {/* FORCE REMOVE Button (Danger Action) */}
+      {onForceRemove && (
+        <div style={{ marginTop: "-8px", marginBottom: "16px" }}>
+          <button
+            type="button"
+            onClick={onForceRemove}
+            disabled={forceRemoveLoading}
+            style={{
+              width: "100%",
+              background: "#1c1b1b",
+              border: "2px solid #dd0061",
+              color: "#dd0061",
+              padding: "8px 12px",
+              fontSize: "12px",
+              fontFamily: "Oswald, sans-serif",
+              fontWeight: "bold",
+              cursor: forceRemoveLoading ? "not-allowed" : "pointer",
+              opacity: forceRemoveLoading ? 0.5 : 1,
+              boxShadow: forceRemoveLoading ? "none" : "2px 2px 0px #dd0061",
+              letterSpacing: "0.5px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+            title="Permanently remove meme from storage & database (Shift+X)"
+          >
+            <span>⚡ FORCE REMOVE [SHIFT+X]</span>
+            <span style={{ fontSize: "10px", color: "#888", fontWeight: "normal" }}>
+              — Irreversible (Immediate R2 deletion & audit log)
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Duplicate-Of Input (if Duplicate is chosen) */}
       {currentStatus === "duplicate" && (

@@ -8,6 +8,7 @@ import {
   type SuperMemeItem
 } from "./curateSuperApi";
 import CuratorComparisonTable from "./CuratorComparisonTable";
+import ForceRemovalAudit from "../../categorise/superadmin/ForceRemovalAudit";
 
 interface CurateSuperDashboardProps {
   onSwitchToJudgeMode: () => void;
@@ -28,6 +29,8 @@ export default function CurateSuperDashboard({
   const [totalCount, setTotalCount] = useState(0);
   const [batchLoading, setBatchLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [showForceRemovalAudit, setShowForceRemovalAudit] = useState<boolean>(false);
+  const token = sessionStorage.getItem("curator_token") || "";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -110,6 +113,22 @@ export default function CurateSuperDashboard({
 
           <button
             type="button"
+            onClick={() => setShowForceRemovalAudit((prev) => !prev)}
+            style={{
+              background: showForceRemovalAudit ? "#dd0061" : "#1c1b1b",
+              color: showForceRemovalAudit ? "#ffffff" : "#dd0061",
+              border: "1px solid #dd0061",
+              padding: "6px 14px",
+              fontFamily: "Anton",
+              fontSize: "12px",
+              cursor: "pointer"
+            }}
+          >
+            {showForceRemovalAudit ? "BACK TO DASHBOARD" : "⚡ FORCE REMOVAL AUDIT"}
+          </button>
+
+          <button
+            type="button"
             onClick={onSwitchToJudgeMode}
             style={{
               background: "#9b30ff",
@@ -144,8 +163,12 @@ export default function CurateSuperDashboard({
 
       {/* Main Container */}
       <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px", width: "100%", flex: 1 }}>
-        {/* KPI Cards Strip */}
-        {summary && (
+        {showForceRemovalAudit ? (
+          <ForceRemovalAudit token={token} />
+        ) : (
+          <>
+            {/* KPI Cards Strip */}
+            {summary && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "24px" }}>
             <div style={{ background: "#1c1b1b", border: "1px solid #444", padding: "14px" }}>
               <div style={{ fontSize: "11px", color: "#888" }}>TOTAL CORPUS</div>
@@ -372,6 +395,8 @@ export default function CurateSuperDashboard({
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

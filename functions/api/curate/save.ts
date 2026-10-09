@@ -38,6 +38,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "corpus_status must be 'keep', 'excluded', 'duplicate', or 'review_later'." }, { status: 400 });
     }
 
+    // Guard: if meme has been force-removed, return 410
+    const isRemoved = await env.DB.prepare(
+      "SELECT r2_deleted FROM meme_force_removals WHERE meme_id = ?"
+    ).bind(memeId).first<{ r2_deleted: number }>();
+
+    if (isRemoved) {
+      return json(
+        { error: "meme_removed", message: "This meme has been permanently force-removed." },
+        { status: 410 }
+      );
+    }
+
     // Determine user from session or explicit payload
     const userId = sessionUser?.id || (body.user_id ? body.user_id.trim() : "user-judge1");
     const userName = sessionUser?.display_name || (body.user_name && body.user_name.trim() !== "Judge" ? body.user_name.trim() : "Judge One");

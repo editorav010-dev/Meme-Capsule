@@ -15,10 +15,10 @@ interface ForceRemovalRecord {
 
 interface ForceRemovalAuditProps {
   token: string;
-  user: CatUser;
+  user?: CatUser;
 }
 
-export default function ForceRemovalAudit({ token, user }: ForceRemovalAuditProps) {
+export default function ForceRemovalAudit({ token }: ForceRemovalAuditProps) {
   const [removals, setRemovals] = useState<ForceRemovalRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");

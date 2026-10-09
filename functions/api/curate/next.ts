@@ -162,7 +162,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       total = totalMemesCache.count;
     } else {
       const totalCountRes = await env.DB.prepare(
-        "SELECT COUNT(*) as cnt FROM memes"
+        "SELECT COUNT(*) as cnt FROM memes WHERE is_active = 1"
       ).first<{ cnt: number }>();
       total = totalCountRes?.cnt ?? 0;
       totalMemesCache = { count: total, expiresAt: now + TOTAL_CACHE_TTL_MS };
@@ -176,7 +176,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const remaining = Math.max(0, total - reviewed);
 
     // 2. Build the human-curation queue filter.
-    let whereClause = "WHERE 1=1";
+    let whereClause = "WHERE m.is_active = 1";
 
     if (filter === "unreviewed") {
       whereClause += " AND c.corpus_status IS NULL";
