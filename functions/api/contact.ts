@@ -1,19 +1,15 @@
 // functions/api/contact.ts
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
 
-interface Env {
+export interface Env {
   RESEND_API_KEY: string
   CONTACT_RECIPIENT_EMAIL?: string
   CONTACT_FROM_EMAIL?: string
 }
 
 const POST_CORS_HEADERS: Record<string, string> = {
-  ...CORS_HEADERS,
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
 export async function onRequestOptions(): Promise<Response> {
@@ -38,7 +34,7 @@ export async function onRequestPost(context: { env: Env; request: Request }): Pr
   }
 
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       name?: string
       email?: string
       subject?: string
@@ -47,12 +43,10 @@ export async function onRequestPost(context: { env: Env; request: Request }): Pr
       _hp?: string // Spam honeypot
     }
 
-    // 1. Bot check: Honeypot field must be empty
     if (body._hp) {
       return new Response(JSON.stringify({ success: true }), { status: 200, headers })
     }
 
-    // 2. Validate input fields
     const name = body.name?.trim()
     const email = body.email?.trim()
     const subject = body.subject?.trim() || 'General Question'
@@ -73,14 +67,31 @@ export async function onRequestPost(context: { env: Env; request: Request }): Pr
       )
     }
 
-    const recipient = env.CONTACT_RECIPIENT_EMAIL || 'memecapsule.app@gmail.com'
-    const fromAddress = env.CONTACT_FROM_EMAIL || 'Meme Capsule Support <onboarding@resend.dev>'
+    let recipient = (env.CONTACT_RECIPIENT_EMAIL || '').trim()
+    const recipientMatch = recipient.match(/<([^>]+)>/)
+    if (recipientMatch) {
+      recipient = recipientMatch[1].trim()
+    }
+    if (!recipient || !recipient.includes('@')) {
+      recipient = 'support@memecapsule.wtf'
+    }
 
-    // 3. Dispatch to Resend API
+    let fromAddress = (env.CONTACT_FROM_EMAIL || '').trim()
+    const emailMatch = fromAddress.match(/<([^>]+)>/)
+    if (emailMatch) {
+      const emailOnly = emailMatch[1].trim()
+      const namePart = fromAddress.replace(/<[^>]+>/, '').trim()
+      fromAddress = namePart ? `${namePart} <${emailOnly}>` : `Meme Capsule <${emailOnly}>`
+    } else if (fromAddress.includes('@')) {
+      fromAddress = `Meme Capsule <${fromAddress}>`
+    } else {
+      fromAddress = 'Meme Capsule <onboarding@resend.dev>'
+    }
+
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -102,19 +113,24 @@ export async function onRequestPost(context: { env: Env; request: Request }): Pr
       }),
     })
 
-    const resendData = await resendRes.json() as { id?: string; error?: any }
+    const resendData = (await resendRes.json()) as any
 
     if (!resendRes.ok) {
+      const errorMsg =
+        resendData?.message ||
+        resendData?.error?.message ||
+        (typeof resendData?.error === 'string' ? resendData.error : '') ||
+        'Failed to dispatch email via Resend'
       return new Response(
-        JSON.stringify({ error: resendData.error?.message || 'Failed to dispatch email via Resend' }),
+        JSON.stringify({ error: errorMsg, details: resendData }),
         { status: resendRes.status, headers }
       )
     }
 
-    return new Response(
-      JSON.stringify({ success: true, id: resendData.id }),
-      { status: 200, headers }
-    )
+    return new Response(JSON.stringify({ success: true, id: resendData.id }), {
+      status: 200,
+      headers,
+    })
   } catch (err: any) {
     return new Response(
       JSON.stringify({ error: err?.message || 'Internal server error processing contact submission' }),

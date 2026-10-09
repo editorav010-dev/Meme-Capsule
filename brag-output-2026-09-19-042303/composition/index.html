@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920,height=1080">
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    :root{--ink:#16120f;--paper:#fff8e7;--white:#fff;--accent:#ffcc4d;--coral:#ff6f61;--mint:#3bc8a0;--blue:#4a8cff;--line:rgba(22,18,15,.14)}
+    *{box-sizing:border-box}html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--paper)}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+    #root{position:relative;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 15% 14%,rgba(255,204,77,.45),transparent 28%),radial-gradient(circle at 88% 72%,rgba(59,200,160,.28),transparent 24%),linear-gradient(145deg,#fff8e7 0%,#f7fbff 48%,#fff1ee 100%)}
+    .orb{position:absolute;border-radius:50%;filter:blur(2px);opacity:.7}.orb.one{width:250px;height:250px;left:150px;top:120px;background:var(--accent)}.orb.two{width:190px;height:190px;right:160px;bottom:120px;background:var(--mint)}
+    .scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:76px 120px}
+    .topline{position:absolute;left:130px;top:100px;text-transform:uppercase;font-size:22px;font-weight:900;letter-spacing:.12em;opacity:.68}
+    h1,h2,p{margin:0}.hook{text-align:center;max-width:1320px}.hook h1{font-size:104px;line-height:.96;letter-spacing:-.06em}.hook .sub{margin-top:34px;font-size:28px;font-weight:800;opacity:.68}
+    .cta{display:inline-flex;align-items:center;gap:18px;margin-top:54px;padding:22px 34px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:28px;font-weight:900;box-shadow:0 18px 34px rgba(22,18,15,.2)}
+    .capsule-stage{width:720px;min-height:650px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}.shake-label{font-size:24px;font-weight:900;color:rgba(22,18,15,.68)}
+    .meme-card{width:590px;min-height:560px;padding:26px;border-radius:34px;background:rgba(255,255,255,.82);border:1px solid var(--line);box-shadow:0 24px 80px rgba(22,18,15,.16);display:flex;flex-direction:column;gap:18px}
+    .meme-toolbar{display:flex;justify-content:space-between;align-items:center}.pill{padding:10px 16px;border-radius:999px;background:var(--accent);font-size:18px;font-weight:900;text-transform:uppercase}.category{font-size:18px;font-weight:800;opacity:.62}
+    .meme-art{flex:1;min-height:390px;border-radius:24px;background:#fff8e7;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.meme-art:before,.meme-art:after{content:"";position:absolute;border-radius:50%;background:var(--accent);opacity:.7}.meme-art:before{width:100px;height:100px;left:52px;top:38px}.meme-art:after{width:150px;height:150px;right:-22px;bottom:-22px;opacity:.24}
+    .meme-copy{text-align:center;position:relative;z-index:1}.meme-copy small{display:block;font-size:23px;font-weight:900}.meme-copy strong{display:block;font-size:74px;line-height:.9;letter-spacing:-.06em}.meme-copy span{display:block;margin-top:24px;font-size:25px;font-weight:800;opacity:.7}.chaos{display:inline-block;margin-top:30px;padding:14px 24px;border-radius:999px;background:var(--accent);font-size:18px;font-weight:900}
+    .actions{display:flex;gap:16px;justify-content:center}.action{padding:15px 24px;border-radius:999px;background:rgba(255,255,255,.78);border:1px solid var(--line);font-size:22px;font-weight:900;box-shadow:0 10px 24px rgba(22,18,15,.08)}.action.like{background:var(--coral)}.action.lol{background:var(--mint)}
+    .report-shell{width:1080px;padding:38px;border-radius:28px;background:#1d1d1d;color:#f5f5f5;border:2px solid #000;box-shadow:8px 8px #000}.report-head{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid #474747;padding-bottom:25px}.report-head h2{font-size:64px;letter-spacing:-.05em}.report-head p{color:#b8b8b8;font-size:22px}.report-body{display:flex;gap:22px;margin-top:26px}.report-card{flex:1;background:#282828;border:2px solid #000;padding:24px}.report-card .status{display:inline-block;padding:8px 13px;border:2px solid #000;background:#000;color:var(--accent);font-size:15px;font-weight:900;text-transform:uppercase}.report-card h3{font-size:30px;margin:22px 0 8px}.report-card p{color:#b8b8b8;font-size:20px}.report-actions{display:flex;gap:14px;margin-top:28px}.report-actions span{padding:13px 18px;border:2px solid #000;font-weight:900}.resolve{background:var(--mint);color:#111}.dismiss{background:var(--coral);color:#111}
+    .outro{text-align:center}.outro .brand{font-size:112px;font-weight:950;letter-spacing:-.08em}.outro .tag{margin-top:24px;font-size:34px;font-weight:900}.outro .tiny{margin-top:46px;font-size:20px;font-weight:800;opacity:.62}
+    .clip{will-change:transform,opacity}
+  </style>
+</head>
+<body>
+  <main id="root" data-composition-id="main" data-start="0" data-duration="20" data-width="1920" data-height="1080">
+    <div class="orb one"></div><div class="orb two"></div>
+    <section id="scene-hook" class="scene clip" data-start="0" data-duration="3.7" data-track-index="0">
+      <div class="hook"><div class="topline">Meme Capsule</div><h1>One tap.<br>One curated laugh.</h1><p class="sub">A tiny capsule for approved internet chaos.</p><div id="hook-cta" class="cta">✦ <span>Spawn a Random Meme</span></div></div>
+    </section>
+    <section id="scene-reveal" class="scene clip" data-start="3.7" data-duration="4.9" data-track-index="0">
+      <div class="capsule-stage"><div id="shake-label" class="shake-label">Ready when you are.</div><div id="meme-card" class="meme-card"><div class="meme-toolbar"><span class="pill">Rare</span><span class="category">Quick Laughs</span></div><div class="meme-art"><div class="meme-copy"><small>I opened the app</small><strong>for one meme</strong><span>three shares later</span><b class="chaos">CURATED CHAOS</b></div></div></div><div id="revealed-cta" class="cta">✦ <span>Spawn Another</span></div></div>
+    </section>
+    <section id="scene-actions" class="scene clip" data-start="8.6" data-duration="4.6" data-track-index="0">
+      <div class="capsule-stage"><div class="meme-card"><div class="meme-toolbar"><span class="pill">Rare</span><span class="category">Quick Laughs</span></div><div class="meme-art"><div class="meme-copy"><small>three shares later</small><strong>mission<br>complete</strong><b class="chaos">CURATED CHAOS</b></div></div></div><div class="actions"><span id="a1" class="action">Share</span><span id="a2" class="action">Save</span><span id="a3" class="action like">♥ 1</span><span id="a4" class="action lol">LOL 1</span></div></div>
+    </section>
+    <section id="scene-reports" class="scene clip" data-start="13.2" data-duration="3.4" data-track-index="0">
+      <div class="report-shell"><div class="report-head"><div><h2>Meme Reports</h2><p>Keep the chaos approved.</p></div><div class="status">1 pending</div></div><div class="report-body"><div class="report-card"><span class="status">Pending</span><h3>“for one meme”</h3><p>Reason: too relatable</p><div class="report-actions"><span class="resolve">Resolve</span><span class="dismiss">Dismiss</span></div></div><div class="report-card"><span class="status" style="color:#34c759">Review flow</span><h3>Fast, clear, human</h3><p>One report in. One decision out.</p></div></div></div>
+    </section>
+    <section id="scene-outro" class="scene clip" data-start="16.6" data-duration="3.4" data-track-index="0">
+      <div class="outro"><div class="brand">Meme Capsule</div><div class="tag">One tap. One curated laugh.</div><div class="tiny">Curated chaos, responsibly shipped.</div></div>
+    </section>
+    <audio id="music" data-start="0" data-duration="20" data-track-index="10" data-volume="0.3" src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3"></audio>
+    <audio id="tap-sfx" data-start="1.35" data-duration="0.8" data-track-index="11" data-volume="0.62" src="assets/sfx/interface/click_001.ogg"></audio>
+    <audio id="reveal-sfx" data-start="3.7" data-duration="1.1" data-track-index="12" data-volume="0.7" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+    <audio id="status-sfx" data-start="13.2" data-duration="0.8" data-track-index="13" data-volume="0.58" src="assets/sfx/interface/drop_001.ogg"></audio>
+  </main>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({paused:true});
+    const scenes = ["#scene-hook","#scene-reveal","#scene-actions","#scene-reports","#scene-outro"];
+    gsap.set(scenes,{opacity:0});
+    // beat-locked: 3.70s — meme reveal lands on a bundled strong cue.
+    // beat-locked: 8.96s — action row lands near a bundled strong cue.
+    // beat-locked: 17.91s — final lockup breathes on a bundled strong cue.
+    tl.to("#scene-hook",{opacity:1,duration:.35},0)
+      .fromTo("#scene-hook .topline",{y:-18,opacity:0},{y:0,opacity:.68,duration:.45,ease:"power2.out"},.2)
+      .fromTo("#scene-hook h1",{y:30,opacity:0},{y:0,opacity:1,duration:.7,ease:"power3.out"},.5)
+      .fromTo("#hook-cta",{y:20,opacity:0,scale:.94},{y:0,opacity:1,scale:1,duration:.55,ease:"back.out(1.5)"},1.35)
+      .to("#scene-hook",{opacity:0,duration:.28},3.42)
+      .to("#scene-reveal",{opacity:1,duration:.3},3.7)
+      .fromTo("#shake-label",{opacity:0,y:-10},{opacity:1,y:0,duration:.3},3.8)
+      .fromTo("#meme-card",{opacity:0,scale:.86,rotation:-3},{opacity:1,scale:1,rotation:0,duration:.75,ease:"back.out(1.4)"},3.92)
+      .fromTo("#revealed-cta",{opacity:0,y:18},{opacity:1,y:0,duration:.4},4.62)
+      .to("#scene-reveal",{opacity:0,duration:.28},8.3)
+      .to("#scene-actions",{opacity:1,duration:.28},8.6)
+      .fromTo("#scene-actions .meme-card",{opacity:0,scale:.9},{opacity:1,scale:1,duration:.5,ease:"back.out(1.3)"},8.7)
+      // beat-grid: action chips use readable spacing and hold the full row.
+      .fromTo("#a1",{opacity:0,y:18},{opacity:1,y:0,duration:.3},10.01)
+      .fromTo("#a2",{opacity:0,y:18},{opacity:1,y:0,duration:.3},10.54)
+      .fromTo("#a3",{opacity:0,y:18},{opacity:1,y:0,duration:.3},11.06)
+      .fromTo("#a4",{opacity:0,y:18},{opacity:1,y:0,duration:.3},11.6)
+      .to("#scene-actions",{opacity:0,duration:.25},12.95)
+      .to("#scene-reports",{opacity:1,duration:.25},13.2)
+      .fromTo("#scene-reports .report-shell",{opacity:0,y:28,scale:.97},{opacity:1,y:0,scale:1,duration:.55,ease:"power2.out"},13.25)
+      .fromTo("#scene-reports .status",{opacity:0,scale:.8},{opacity:1,scale:1,duration:.35,ease:"back.out(1.5)"},13.95)
+      .to("#scene-reports",{opacity:0,duration:.25},16.35)
+      .to("#scene-outro",{opacity:1,duration:.3},16.6)
+      .fromTo("#scene-outro .brand",{opacity:0,scale:.9},{opacity:1,scale:1,duration:.65,ease:"back.out(1.3)"},16.75)
+      .fromTo("#scene-outro .tag",{opacity:0,y:18},{opacity:1,y:0,duration:.4},17.45)
+      .fromTo("#scene-outro .tiny",{opacity:0,y:12},{opacity:1,y:0,duration:.4},18.15)
+      .to("#scene-outro",{opacity:0,duration:.45},19.6);
+    window.__timelines.main = tl;
+    tl.seek(0);
+  </script>
+</body>
+</html>

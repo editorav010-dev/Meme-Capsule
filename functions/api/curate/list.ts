@@ -31,7 +31,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const offset = (page - 1) * perPage;
     const publicBase = (env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-    let whereClause = "WHERE 1=1";
+    let whereClause = "WHERE m.id NOT IN (SELECT meme_id FROM meme_force_removals)";
     if (filter === "unreviewed") {
       whereClause += " AND c.corpus_status IS NULL";
     } else if (filter === "review_later") {

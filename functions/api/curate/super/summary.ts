@@ -34,11 +34,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
     }
 
-    // 1. Total memes in corpus
-    const totalCountRes = await env.DB.prepare(
-      "SELECT COUNT(*) as cnt FROM memes"
-    ).first<{ cnt: number }>();
-    const totalMemes = totalCountRes?.cnt ?? 0;
+    // 1. Total memes in corpus (excluding force-removed)
+    let totalMemes = 0;
+    try {
+      const totalCountRes = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM memes WHERE id NOT IN (SELECT meme_id FROM meme_force_removals)"
+      ).first<{ cnt: number }>();
+      totalMemes = totalCountRes?.cnt ?? 0;
+    } catch {
+      const totalCountRes = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM memes"
+      ).first<{ cnt: number }>();
+      totalMemes = totalCountRes?.cnt ?? 0;
+    }
 
     // 2. Final resolved count (Authoritative Keep / Active vs Excluded)
     let resolvedActiveCount = 0;

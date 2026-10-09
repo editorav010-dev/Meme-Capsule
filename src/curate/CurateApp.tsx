@@ -7,7 +7,7 @@ import {
   type CorpusStatus,
   type CuratorUser
 } from "./curateTypes";
-import { fetchNextMeme, approveCuration, forceRemoveMeme } from "./curateApi";
+import { fetchNextMeme, approveCuration, saveCuration, forceRemoveMeme } from "./curateApi";
 import EditorialButtons from "./EditorialButtons";
 import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
@@ -76,6 +76,18 @@ export default function CurateApp() {
   const [undoStack, setUndoStack] = useState<UndoHistoryItem[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  // Force Remove state
+  const [showForceRemoveModal, setShowForceRemoveModal] = useState<boolean>(false);
+  const [forceRemoveReason, setForceRemoveReason] = useState<string>("");
+  const [forceRemoveLoading, setForceRemoveLoading] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   // AI Judge State & Hook
   const [aiConfig, setAiConfig] = useState<AiJudgeConfig>(DEFAULT_AI_JUDGE_CONFIG);
 
@@ -119,7 +131,9 @@ export default function CurateApp() {
     currentMeme,
     isSaving: false,
     undoStack,
-    overrideMode
+    overrideMode,
+    showForceRemoveModal: false,
+    forceRemoveLoading: false
   });
 
   useEffect(() => {
@@ -133,9 +147,11 @@ export default function CurateApp() {
       currentMeme,
       isSaving,
       undoStack,
-      overrideMode
+      overrideMode,
+      showForceRemoveModal,
+      forceRemoveLoading
     };
-  }, [status, topics, tone, mechanisms, duplicateOf, note, currentMeme, isSaving, undoStack, overrideMode]);
+  }, [status, topics, tone, mechanisms, duplicateOf, note, currentMeme, isSaving, undoStack, overrideMode, showForceRemoveModal, forceRemoveLoading]);
 
   const handleLoginSuccess = (newToken: string, newUser: CuratorUser) => {
     sessionStorage.setItem("curator_token", newToken);
@@ -276,27 +292,36 @@ export default function CurateApp() {
     return nextMeme;
   }, [user, loadMeme]);
 
-  // Permanently delete invalid/non-meme image from R2 and database (Shift+Delete)
+  // Permanently delete invalid/non-meme image from R2 and database
   const handleForceRemove = useCallback(async () => {
     const s = stateRef.current;
-    if (!s.currentMeme || s.isSaving) return;
+    if (!s.currentMeme || s.forceRemoveLoading || s.isSaving) return;
     const memeId = s.currentMeme.id;
 
+    setForceRemoveLoading(true);
     setIsSaving(true);
     stateRef.current.isSaving = true;
 
     try {
       await forceRemoveMeme(memeId);
+      setToast({
+        message: "FORCE REMOVED ✓ (Purged from R2 & DB)",
+        type: "success"
+      });
+      setShowForceRemoveModal(false);
+      setForceRemoveReason("");
       // Remove any items for this meme from undoStack since deletion is permanent
       setUndoStack((prev) => prev.filter((item) => item.meme.id !== memeId));
-    } catch (err) {
+      await loadMeme(memeId, "next");
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Force remove failed";
       console.error("Failed to force-remove meme:", err);
+      setToast({ message: errorMsg, type: "error" });
     } finally {
+      setForceRemoveLoading(false);
       setIsSaving(false);
       stateRef.current.isSaving = false;
     }
-
-    await loadMeme(memeId, "next");
   }, [loadMeme]);
 
   // Topic Toggle (Max 3)
@@ -352,6 +377,33 @@ export default function CurateApp() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+
+      // If Force Remove modal is open, intercept Escape and Enter
+      if (stateRef.current.showForceRemoveModal) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          if (!stateRef.current.forceRemoveLoading) {
+            setShowForceRemoveModal(false);
+            setForceRemoveReason("");
+          }
+          return;
+        }
+        if (e.key === "Enter" && !stateRef.current.forceRemoveLoading) {
+          e.preventDefault();
+          handleForceRemove();
+          return;
+        }
+        return; // Suspend all other shortcuts while modal is open
+      }
+
+      // Force Remove shortcut: Shift+X (works anywhere in Judge view)
+      if (e.shiftKey && (e.key === "X" || e.key === "x")) {
+        e.preventDefault();
+        if (stateRef.current.currentMeme && !stateRef.current.forceRemoveLoading && !stateRef.current.isSaving) {
+          setShowForceRemoveModal(true);
+        }
         return;
       }
 
@@ -727,7 +779,27 @@ export default function CurateApp() {
                 <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#888" }}>ID: {currentMeme.id}</div>
                 <div style={{ fontSize: "14px", fontWeight: "bold", color: "#fff" }}>{currentMeme.title}</div>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForceRemoveModal(true)}
+                  disabled={forceRemoveLoading}
+                  style={{
+                    background: "#1c1b1b",
+                    border: "2px solid #dd0061",
+                    color: "#dd0061",
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    fontFamily: "Oswald, sans-serif",
+                    fontWeight: "bold",
+                    cursor: forceRemoveLoading ? "not-allowed" : "pointer",
+                    boxShadow: "2px 2px 0px #dd0061",
+                    letterSpacing: "0.5px"
+                  }}
+                  title="Permanently remove meme from storage & database (Shift+X)"
+                >
+                  ⚡ FORCE REMOVE [SHIFT+X]
+                </button>
                 <button
                   type="button"
                   onClick={() => loadMeme(currentMeme.id, "prev")}
@@ -886,6 +958,7 @@ export default function CurateApp() {
             <span><span className="curate-hotkey-tag">SHIFT+DEL</span> FORCE REMOVE</span>
             <span><span className="curate-hotkey-tag">CTRL+Z / U</span> UNDO</span>
             <span><span className="curate-hotkey-tag">←/→</span> PREV/NEXT</span>
+            <span style={{ color: "#dd0061" }}><span className="curate-hotkey-tag" style={{ border: "1px solid #dd0061", color: "#dd0061" }}>SHIFT+X</span> FORCE REMOVE</span>
           </>
         ) : (
           <>
@@ -898,12 +971,183 @@ export default function CurateApp() {
             <span><span className="curate-hotkey-tag">SHIFT+DEL</span> FORCE REMOVE</span>
             <span><span className="curate-hotkey-tag">CTRL+Z / U</span> UNDO</span>
             <span><span className="curate-hotkey-tag">←/→</span> PREV/NEXT</span>
+            <span style={{ color: "#dd0061" }}><span className="curate-hotkey-tag" style={{ border: "1px solid #dd0061", color: "#dd0061" }}>SHIFT+X</span> FORCE REMOVE</span>
           </>
         )}
       </footer>
 
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: "16px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1100,
+            padding: "10px 20px",
+            background: toast.type === "success" ? "#34C759" : toast.type === "warning" ? "#FF9F0A" : "#FF3B30",
+            color: "#121212",
+            fontFamily: "Anton, sans-serif",
+            fontSize: "15px",
+            letterSpacing: "1px",
+            boxShadow: "4px 4px 0px #000",
+            border: "2px solid #000"
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
+
       {/* Stats & Export Modal */}
       {showStatsModal && <CurationStatsModal onClose={() => setShowStatsModal(false)} />}
+
+      {/* Force Remove Confirmation Modal */}
+      {showForceRemoveModal && currentMeme && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px"
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !forceRemoveLoading) {
+              setShowForceRemoveModal(false);
+              setForceRemoveReason("");
+            }
+          }}
+        >
+          <div
+            style={{
+              background: "#1a1a1a",
+              border: "2px solid #dd0061",
+              boxShadow: "6px 6px 0px #dd0061",
+              padding: "28px",
+              maxWidth: "480px",
+              width: "100%",
+              textAlign: "center"
+            }}
+          >
+            <div style={{ color: "#dd0061", fontFamily: "Anton, sans-serif", fontSize: "24px", letterSpacing: "1px", marginBottom: "8px" }}>
+              PERMANENT FORCE REMOVE
+            </div>
+
+            <div
+              style={{
+                width: "140px",
+                height: "140px",
+                margin: "12px auto 16px auto",
+                border: "2px solid #333",
+                background: "#121212",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden"
+              }}
+            >
+              <img
+                src={currentMeme.image_url}
+                alt={currentMeme.title}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "12px", fontSize: "12px" }}>
+              <div style={{ color: "#8e8e93", fontFamily: "monospace", marginBottom: "4px" }}>
+                ID: {currentMeme.id}
+              </div>
+              <div style={{ color: "#ffffff", fontWeight: 500, fontSize: "14px" }}>
+                {currentMeme.title}
+              </div>
+            </div>
+
+            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "16px", lineHeight: "1.5" }}>
+              PERMANENTLY DELETE THIS MEME? It will be removed from R2 storage and hidden from the app immediately. This cannot be undone.
+            </p>
+
+            <input
+              type="text"
+              placeholder="Reason (optional, max 200 chars)"
+              value={forceRemoveReason}
+              onChange={(e) => setForceRemoveReason(e.target.value.slice(0, 200))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !forceRemoveLoading) {
+                  e.preventDefault();
+                  handleForceRemove();
+                } else if (e.key === "Escape" && !forceRemoveLoading) {
+                  e.preventDefault();
+                  setShowForceRemoveModal(false);
+                  setForceRemoveReason("");
+                }
+              }}
+              disabled={forceRemoveLoading}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                marginBottom: "16px",
+                background: "#262626",
+                border: "1px solid #444",
+                color: "#ffffff",
+                fontSize: "12px",
+                fontFamily: "monospace",
+                boxSizing: "border-box",
+                opacity: forceRemoveLoading ? 0.5 : 1,
+                outline: "none"
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForceRemoveModal(false);
+                  setForceRemoveReason("");
+                }}
+                disabled={forceRemoveLoading}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "#262626",
+                  border: "1px solid #444",
+                  color: "#888",
+                  fontSize: "13px",
+                  fontFamily: "Oswald, sans-serif",
+                  cursor: forceRemoveLoading ? "not-allowed" : "pointer",
+                  opacity: forceRemoveLoading ? 0.5 : 1
+                }}
+              >
+                CANCEL (ESC)
+              </button>
+              <button
+                type="button"
+                onClick={handleForceRemove}
+                disabled={forceRemoveLoading}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "#dd0061",
+                  border: "2px solid #dd0061",
+                  color: "#000",
+                  fontSize: "13px",
+                  fontFamily: "Anton, sans-serif",
+                  fontWeight: "bold",
+                  letterSpacing: "0.5px",
+                  cursor: forceRemoveLoading ? "not-allowed" : "pointer",
+                  boxShadow: forceRemoveLoading ? "none" : "2px 2px 0px #ffffff",
+                  opacity: forceRemoveLoading ? 0.7 : 1
+                }}
+              >
+                {forceRemoveLoading ? "DELETING..." : "CONFIRM REMOVAL (ENTER)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Account Settings Modal */}
       {showAccountModal && user && (

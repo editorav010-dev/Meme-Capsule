@@ -55,8 +55,9 @@ The legacy prototype landing UI (`src/App.tsx`, `src/styles.css`) has been perma
   - `/api/curate/account`: Self-service judge credential management.
   - `/api/curate/ai-presets`: Judge-isolated vision model configurations.
   - `/api/curate/super/*`: SuperAdmin conflict resolution, bulk resolution, and summary stats.
-- **Categorization APIs (`functions/api/cat/`)**:
+- **Categorization & Force Removal APIs (`functions/api/cat/`)**:
   - `/api/cat/decide`, `/api/cat/next`, `/api/cat/login`, `/api/cat/logout`, `/api/cat/me`: Taxonomy tagging operations.
+  - `/api/cat/force-remove`: Irreversible purge deactivating D1, logging `meme_force_removals` audit row, and physically deleting media from R2 bucket. See [FORCE_REMOVE_FEATURE.md](file:///Users/prathampandey/Desktop/ai-categoriser/Meme-Capsule/docs/FORCE_REMOVE_FEATURE.md).
 - **AI Pre-Curator APIs (`functions/api/ai-judge/`)**:
   - `/api/ai-judge/classify`, `/api/ai-judge/run/start`, `/api/ai-judge/run/stop`, `/api/ai-judge/run/progress`: Autonomous multimodal evaluation loop.
 
@@ -81,8 +82,7 @@ The database `meme-capsule-db` (SQLite at the edge) operates under 13 sequential
 - Zero egress fees for high-volume WebP image and MP4/GIF delivery.
 - Media synchronization engine in `/admin` ensuring D1 metadata matches physical R2 storage objects.
 
-### D. Internal Frontend Workbenches (`src/`)
-- **`/curate`**: Multi-judge consensus curation dashboard with keyboard shortcuts (`K`, `X`, `D`, `R`), fast-approval of AI Consensus (`Space`/`Enter`), instant single-AI adoption, authoritative single-judge finality (`POST /api/curate/approve`), destructive Force Remove (`Shift+Delete` / `POST /api/curate/force-remove`), Superadmin dashboard view, judge account management, judge-isolated AI presets, and CSV/JSON export. Deeply integrates the **AI-Judgement Review Workflow** with AI Judges 4 and 5.
+- **`/curate`**: Multi-judge consensus curation dashboard with keyboard shortcuts (`K`, `X`, `D`, `R`), fast-approval of AI Consensus (`Space`/`Enter`), instant single-AI adoption, authoritative single-judge finality (`POST /api/curate/approve`), destructive Force Remove (`Shift+Delete` / `POST /api/curate/force-remove`), Superadmin dashboard view with force removal audit, judge account management, judge-isolated AI presets, and CSV/JSON export. Deeply integrates the **AI-Judgement Review Workflow** with AI Judges 4 and 5.
 - **`/admin`**: Administration console with D1 SQL console, R2 media sync, 5-metric status bar, CSV/Excel export, analytics algorithm tuning, and dark mode.
 - **`/categorise`**: Multi-topic taxonomy tagging, tone labeling, and humor mechanism tagging.
 - **`/ai-judge`**: Multimodal AI pre-curator loop powered by NVIDIA NIM Llama 3.2 Vision and universal vision models.

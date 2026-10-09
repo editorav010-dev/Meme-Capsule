@@ -173,3 +173,20 @@ export async function catReset(
   });
   return handleResponse(res);
 }
+
+export async function catForceRemove(
+  token: string,
+  memeId: string,
+  reason?: string
+): Promise<{ success: boolean; meme_id: string; r2_deleted: boolean; warning?: string; already_removed?: boolean }> {
+  const res = await fetch("/api/cat/force-remove", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ meme_id: memeId, reason: reason || undefined })
+  });
+  if (res.status === 410) {
+    // Meme was already removed by force-remove endpoint
+    throw new Error("meme_removed");
+  }
+  return handleResponse(res);
+}

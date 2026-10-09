@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-09
+
+- Added **Force Remove** feature across `/curate` and `/categorise` portals:
+  - Enabled judge/superadmin irreversible deletion (`POST /api/cat/force-remove`) with immediate D1 deactivation (`is_active = 0, status = 'archived'`), audit logging in `meme_force_removals`, and physical R2 media object deletion.
+  - Added Neo-Brutalist stage button `⚡ FORCE REMOVE [SHIFT+X]`, Layer 0 action button, global `Shift+X` keyboard shortcut, thumbnail preview confirmation modal, toast feedback, and auto-advance.
+  - Added `⚡ FORCE REMOVAL AUDIT` dashboard tab in `/curate` SuperAdmin view with 1-click R2 deletion retry.
+  - Added `410 Gone` guard in `/api/curate/save` for force-removed items.
+  - **Fixed 171-meme queue collapse regression**: Removed incorrect `is_active = 1` filter in `/api/curate/next`, `/api/curate/list`, `/api/curate/stats`, and superadmin endpoints, restoring the entire 5,000+ unreviewed meme backlog while cleanly excluding `meme_force_removals`.
+  - Created architectural context document `docs/FORCE_REMOVE_FEATURE.md`.
+
 ## 2026-09-28
 
 - Completed full documentation audit & repository reorganization: all markdown files centralized into `/docs`.

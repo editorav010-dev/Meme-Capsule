@@ -15,7 +15,7 @@
 import type { PagesFunction } from "../../_shared/pages";
 import { json, handleD1Error, type Env } from "../../_shared/d1r2";
 import { validateSession } from "../../_shared/catAuth";
-import { ensureAIPredictionTable, ensureCurationTables } from "../../_shared/curateDb";
+import { ensureAIPredictionTable, ensureCurationTables, ensureForceRemovalsTable } from "../../_shared/curateDb";
 
 // In-memory isolate cache for static total memes count (avoids scanning 5,000+ rows on every swipe)
 let totalMemesCache: { count: number; expiresAt: number } | null = null;
@@ -155,17 +155,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const direction = url.searchParams.get("direction") || "next";
     const publicBase = (env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-    // 1. Overall counts for this judge (cached total to prevent full table scans).
-    const now = Date.now();
+    await ensureForceRemovalsTable(env.DB);
+
+    // 1. Overall counts for this judge across the entire corpus (excluding force-removed memes).
     let total = 0;
-    if (totalMemesCache && totalMemesCache.expiresAt > now) {
-      total = totalMemesCache.count;
-    } else {
+    try {
+      const totalCountRes = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM memes WHERE id NOT IN (SELECT meme_id FROM meme_force_removals)"
+      ).first<{ cnt: number }>();
+      total = totalCountRes?.cnt ?? 0;
+    } catch {
       const totalCountRes = await env.DB.prepare(
         "SELECT COUNT(*) as cnt FROM memes"
       ).first<{ cnt: number }>();
       total = totalCountRes?.cnt ?? 0;
-      totalMemesCache = { count: total, expiresAt: now + TOTAL_CACHE_TTL_MS };
     }
 
     const reviewedCountRes = await env.DB.prepare(`
@@ -178,7 +181,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const remaining = Math.max(0, total - reviewed);
 
     // 2. Build the human-curation queue filter.
-    let whereClause = "WHERE 1=1";
+    // Exclude force-removed memes from any curation queue, but DO NOT filter on is_active = 1
+    // because unreviewed memes in the curation pipeline have is_active = 0 until finalized as 'keep'!
+    let whereClause = "WHERE m.id NOT IN (SELECT meme_id FROM meme_force_removals)";
 
     if (filter === "unreviewed") {
       whereClause += " AND c.corpus_status IS NULL AND mcf.corpus_status IS NULL";
