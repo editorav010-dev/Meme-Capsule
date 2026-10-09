@@ -5,9 +5,9 @@
  * Idempotent: safe to call multiple times.
  */
 
-import type { PagesFunction } from "../../../_shared/pages";
-import { json, type Env } from "../../../_shared/d1r2";
-import { requireAuth } from "../../../_shared/catAuth";
+import type { PagesFunction } from "../../_shared/pages";
+import { json, type Env } from "../../_shared/d1r2";
+import { requireAuth } from "../../_shared/catAuth";
 
 interface ForceRemovePayload {
   meme_id?: string;
