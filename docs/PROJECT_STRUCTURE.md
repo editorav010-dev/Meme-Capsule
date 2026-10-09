@@ -1561,6 +1561,7 @@ meme application/
 │   ├── CLOUDFLARE_D1_USAGE_AND_OPTIMIZATION_REPORT.md
 │   ├── CLOUDFLARE_LIMITS_AND_SCALING_RESEARCH.md
 │   ├── DATABASE.md                                   # Database and storage architecture docs
+│   ├── FORCE_REMOVE_FEATURE.md
 │   ├── GEMINI.md
 │   ├── MEME_CAPSULE_KNOWLEDGE.md
 │   ├── PRIVACY_COOKIES_AND_DATA_FLOWS.md
