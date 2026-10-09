@@ -3,118 +3,377 @@ import type { CuratedMemeData } from "./curateTypes";
 interface AiReviewPanelProps {
   j4?: CuratedMemeData | null;
   j5?: CuratedMemeData | null;
-  aiState: 'A' | 'B' | 'C';
-  allDetailsMatch: boolean;
   onEnterOverride: () => void;
-  onAdopt: (j: CuratedMemeData) => void;
+  onAdopt: (j: CuratedMemeData, source: "judge4" | "judge5" | "consensus") => void;
+  onForceRemove: () => void;
 }
 
-export default function AiReviewPanel({ j4, j5, aiState, allDetailsMatch, onEnterOverride, onAdopt }: AiReviewPanelProps) {
-  const renderJudgeCard = (judgeName: string, j?: CuratedMemeData | null, shortcut?: string, onSelect?: () => void) => {
-    if (!j) return null;
+export default function AiReviewPanel({
+  j4,
+  j5,
+  onEnterOverride,
+  onAdopt,
+  onForceRemove
+}: AiReviewPanelProps) {
+  const hasJ4 = Boolean(j4?.corpus_status);
+  const hasJ5 = Boolean(j5?.corpus_status);
+
+  // Both AIs evaluated
+  const bothEvaluated = hasJ4 && hasJ5;
+  const isStatusConsensus = bothEvaluated && j4!.corpus_status === j5!.corpus_status;
+
+  const topicsMatch = bothEvaluated && JSON.stringify([...j4!.topics].sort()) === JSON.stringify([...j5!.topics].sort());
+  const mechsMatch = bothEvaluated && JSON.stringify([...j4!.humour_mechanisms].sort()) === JSON.stringify([...j5!.humour_mechanisms].sort());
+  const toneMatch = bothEvaluated && j4!.tone === j5!.tone;
+  const allDetailsMatch = isStatusConsensus && (j4!.corpus_status === "excluded" || (topicsMatch && mechsMatch && toneMatch));
+
+  const renderJudgeCard = (
+    judgeName: string,
+    j: CuratedMemeData,
+    shortcut: string,
+    source: "judge4" | "judge5"
+  ) => {
+    const isKeep = j.corpus_status === "keep";
+    const statusColor = isKeep ? "#34C759" : j.corpus_status === "excluded" ? "#FF3B30" : "#FF9F0A";
+
     return (
-      <div 
-        style={{ 
-          background: "#1c1b1b", 
-          border: "2px solid #555", 
-          padding: "14px", 
+      <div
+        style={{
+          background: "#1c1b1b",
+          border: `2px solid ${statusColor}`,
+          padding: "16px",
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          gap: "8px",
-          cursor: onSelect ? "pointer" : "default"
+          gap: "10px",
+          boxShadow: `3px 3px 0px ${statusColor}`,
+          borderRadius: "2px"
         }}
-        onClick={onSelect}
       >
-        <div style={{ fontSize: "16px", fontWeight: "bold", color: "#c58cff", borderBottom: "1px solid #333", paddingBottom: "6px" }}>
-          {judgeName} <span style={{ color: "#fff" }}>→ {j.corpus_status.toUpperCase()}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "8px" }}>
+          <span style={{ fontSize: "16px", fontWeight: "bold", color: "#c58cff", fontFamily: "Anton", letterSpacing: "0.5px" }}>
+            {judgeName}
+          </span>
+          <span
+            style={{
+              background: statusColor,
+              color: isKeep ? "#121212" : "#ffffff",
+              padding: "2px 8px",
+              fontFamily: "Anton",
+              fontSize: "14px",
+              borderRadius: "2px"
+            }}
+          >
+            {j.corpus_status.toUpperCase()}
+          </span>
         </div>
-        <div style={{ fontSize: "13px", color: "#ddd" }}>
-          <div><span style={{ color: "#888" }}>Topics:</span> {j.topics.join(", ") || "None"}</div>
-          <div><span style={{ color: "#888" }}>Tone:</span> {j.tone || "None"}</div>
-          <div><span style={{ color: "#888" }}>Mechs:</span> {j.humour_mechanisms.join(", ") || "None"}</div>
+
+        <div style={{ fontSize: "13px", color: "#ddd", display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div><span style={{ color: "#888", fontFamily: "monospace" }}>TOPICS:</span> {j.topics.length > 0 ? j.topics.join(", ") : <em style={{ color: "#666" }}>None</em>}</div>
+          <div><span style={{ color: "#888", fontFamily: "monospace" }}>TONE:</span> {j.tone || <em style={{ color: "#666" }}>None</em>}</div>
+          <div><span style={{ color: "#888", fontFamily: "monospace" }}>MECHS:</span> {j.humour_mechanisms.length > 0 ? j.humour_mechanisms.join(", ") : <em style={{ color: "#666" }}>None</em>}</div>
+          {j.curator_note && (
+            <div style={{ marginTop: "4px", fontSize: "11px", color: "#aaa", fontStyle: "italic" }}>
+              Note: {j.curator_note}
+            </div>
+          )}
         </div>
-        {shortcut && (
-          <div style={{ marginTop: "auto", paddingTop: "10px", textAlign: "center" }}>
-            <span className="curate-key-pill">{shortcut}</span> ADOPT
-          </div>
-        )}
+
+        <button
+          type="button"
+          onClick={() => onAdopt(j, source)}
+          style={{
+            marginTop: "auto",
+            padding: "10px",
+            background: "#2a2a2a",
+            border: "1px solid #c58cff",
+            color: "#ffffff",
+            fontFamily: "Anton",
+            fontSize: "15px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            transition: "all 0.15s ease"
+          }}
+          title={`Adopt ${judgeName} decision [Key: ${shortcut}]`}
+        >
+          <span className="curate-key-pill">[{shortcut}]</span>
+          ADOPT {judgeName.toUpperCase()}
+        </button>
       </div>
     );
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "20px" }}>
-      {aiState === 'A' && (
-        <div style={{ background: "#1c1b1b", border: "2px solid #34C759", padding: "16px", textAlign: "center" }}>
-          <div style={{ fontSize: "20px", color: "#34C759", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "12px" }}>
-            AI JUDGE 4 & 5 AGREE: <span style={{ color: "#fff" }}>{j4!.corpus_status.toUpperCase()}</span>
+      {/* 1. STATE A: FULL AI CONSENSUS */}
+      {bothEvaluated && isStatusConsensus && (
+        <div
+          style={{
+            background: "#1c1b1b",
+            border: `2px solid ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`,
+            padding: "18px",
+            boxShadow: `4px 4px 0px ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span
+              style={{
+                fontSize: "20px",
+                color: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
+                fontFamily: "Anton",
+                letterSpacing: "1px"
+              }}
+            >
+              AI CONSENSUS: {j4!.corpus_status.toUpperCase()}
+            </span>
+            <span style={{ fontSize: "11px", background: "#262626", color: "#f4c300", padding: "2px 8px", fontFamily: "monospace" }}>
+              JUDGE 4 & 5 AGREE
+            </span>
           </div>
-          
+
           {allDetailsMatch ? (
             <>
-              <div style={{ display: "flex", justifyContent: "center", gap: "16px", fontSize: "14px", color: "#ddd", marginBottom: "16px" }}>
-                <div><span style={{ color: "#888" }}>Topics:</span> {j4!.topics.join(", ") || "None"}</div>
-                <div><span style={{ color: "#888" }}>Tone:</span> {j4!.tone || "None"}</div>
-                <div><span style={{ color: "#888" }}>Mechs:</span> {j4!.humour_mechanisms.join(", ") || "None"}</div>
-              </div>
-              <div style={{ color: "#34C759", fontSize: "14px", fontWeight: "bold" }}>
-                PRESS [ENTER / SPACE] TO APPROVE AI JUDGEMENT
-              </div>
+              {j4!.corpus_status === "keep" && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", fontSize: "13px", color: "#ddd", marginBottom: "16px", background: "#121212", padding: "10px 14px", border: "1px solid #333" }}>
+                  <div><span style={{ color: "#888" }}>Topics:</span> {j4!.topics.join(", ") || "None"}</div>
+                  <div><span style={{ color: "#888" }}>Tone:</span> {j4!.tone || "None"}</div>
+                  <div><span style={{ color: "#888" }}>Mechanisms:</span> {j4!.humour_mechanisms.join(", ") || "None"}</div>
+                </div>
+              )}
+              {j4!.corpus_status === "excluded" && (
+                <div style={{ fontSize: "13px", color: "#aaa", marginBottom: "14px" }}>
+                  Both AI Judge 4 and Judge 5 have analyzed this meme and determined it should be excluded from the active collection.
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => onAdopt(j4!, "consensus")}
+                style={{
+                  width: "100%",
+                  background: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
+                  color: j4!.corpus_status === "keep" ? "#121212" : "#ffffff",
+                  border: "2px solid #ffffff",
+                  padding: "14px",
+                  fontFamily: "Anton",
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  letterSpacing: "0.5px",
+                  boxShadow: "3px 3px 0px #ffffff"
+                }}
+              >
+                ➔ APPROVE AI CONSENSUS [SPACE / ENTER]
+              </button>
             </>
           ) : (
             <div>
-              <div style={{ color: "#f4c300", fontSize: "13px", marginBottom: "12px" }}>
-                Status matches, but details differ. Select one to adopt:
+              <div style={{ color: "#f4c300", fontSize: "13px", marginBottom: "14px" }}>
+                Both AIs agree on <strong>{j4!.corpus_status.toUpperCase()}</strong>, but categorization details differ. Press [4] or [5] to pick taxonomy, or press [SPACE/ENTER] to adopt AI 4:
               </div>
-              <div style={{ display: "flex", gap: "12px" }}>
-                {renderJudgeCard("AI Judge 4", j4, "4", () => onAdopt(j4!))}
-                {renderJudgeCard("AI Judge 5", j5, "5", () => onAdopt(j5!))}
+              <div style={{ display: "flex", gap: "14px" }}>
+                {renderJudgeCard("AI Judge 4", j4!, "4", "judge4")}
+                {renderJudgeCard("AI Judge 5", j5!, "5", "judge5")}
               </div>
+              <button
+                type="button"
+                onClick={() => onAdopt(j4!, "judge4")}
+                style={{
+                  width: "100%",
+                  marginTop: "12px",
+                  background: "#34C759",
+                  color: "#121212",
+                  border: "2px solid #f4c300",
+                  padding: "12px",
+                  fontFamily: "Anton",
+                  fontSize: "16px",
+                  cursor: "pointer"
+                }}
+              >
+                FAST-APPROVE J4 DECISION [SPACE / ENTER]
+              </button>
             </div>
           )}
         </div>
       )}
 
-      {aiState === 'B' && (
-        <div>
-          <div style={{ fontSize: "16px", color: "#FF9F0A", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "12px", textAlign: "center" }}>
-            AI JUDGE DISAGREEMENT
+      {/* 2. STATE B: AI DISAGREEMENT */}
+      {bothEvaluated && !isStatusConsensus && (
+        <div
+          style={{
+            background: "#1c1b1b",
+            border: "2px solid #FF9F0A",
+            padding: "18px",
+            boxShadow: "4px 4px 0px #FF9F0A"
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+            <span style={{ fontSize: "19px", color: "#FF9F0A", fontFamily: "Anton", letterSpacing: "1px" }}>
+              ⚠️ AI JUDGE DISAGREEMENT
+            </span>
+            <span style={{ fontSize: "11px", background: "#332211", color: "#FF9F0A", padding: "2px 8px", fontFamily: "monospace" }}>
+              CONFLICT DETECTED
+            </span>
           </div>
-          <div style={{ display: "flex", gap: "12px" }}>
-            {renderJudgeCard("AI Judge 4", j4, "4", () => onAdopt(j4!))}
-            {renderJudgeCard("AI Judge 5", j5, "5", () => onAdopt(j5!))}
+          <div style={{ fontSize: "13px", color: "#ccc", marginBottom: "14px" }}>
+            AI Judge 4 and AI Judge 5 reached different conclusions. Human judge authority required:
+          </div>
+          <div style={{ display: "flex", gap: "14px" }}>
+            {renderJudgeCard("AI Judge 4", j4!, "4", "judge4")}
+            {renderJudgeCard("AI Judge 5", j5!, "5", "judge5")}
           </div>
         </div>
       )}
 
-      {aiState === 'C' && (
-        <div style={{ background: "#1c1b1b", border: "2px solid #FF3B30", padding: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "18px", color: "#FF3B30", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "12px" }}>
-            {(!j4 || !j5) ? "INCOMPLETE — AI HAS NOT FINISHED" : "AI RECOMMENDS EXCLUDE — CONFIRM MANUALLY"}
-          </div>
-          <div style={{ color: "#ddd", fontSize: "14px" }}>
-            Fast-approve is unavailable for this meme.
-          </div>
+      {/* 3. STATE SINGLE AI: ONLY ONE AI EVALUATED */}
+      {((hasJ4 && !hasJ5) || (!hasJ4 && hasJ5)) && (
+        <div
+          style={{
+            background: "#1c1b1b",
+            border: "2px solid #f4c300",
+            padding: "18px",
+            boxShadow: "4px 4px 0px #f4c300"
+          }}
+        >
+          {(() => {
+            const singleJudge = j4 || j5!;
+            const judgeLabel = hasJ4 ? "AI Judge 4" : "AI Judge 5";
+            const source = hasJ4 ? "judge4" : "judge5";
+            const isKeep = singleJudge.corpus_status === "keep";
+
+            return (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "18px", color: "#f4c300", fontFamily: "Anton", letterSpacing: "1px" }}>
+                    SINGLE AI EVALUATION: {judgeLabel.toUpperCase()} → {singleJudge.corpus_status.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "11px", background: "#332d18", color: "#f4c300", padding: "2px 8px", fontFamily: "monospace" }}>
+                    1 AI READY
+                  </span>
+                </div>
+
+                <div style={{ background: "#121212", border: "1px solid #333", padding: "12px", marginBottom: "14px", fontSize: "13px", color: "#ddd" }}>
+                  <div><span style={{ color: "#888" }}>Status:</span> <strong style={{ color: isKeep ? "#34C759" : "#FF3B30" }}>{singleJudge.corpus_status.toUpperCase()}</strong></div>
+                  <div><span style={{ color: "#888" }}>Topics:</span> {singleJudge.topics.join(", ") || "None"}</div>
+                  <div><span style={{ color: "#888" }}>Tone:</span> {singleJudge.tone || "None"}</div>
+                  <div><span style={{ color: "#888" }}>Mechanisms:</span> {singleJudge.humour_mechanisms.join(", ") || "None"}</div>
+                  {singleJudge.curator_note && (
+                    <div style={{ marginTop: "4px", fontSize: "11px", color: "#aaa", fontStyle: "italic" }}>
+                      Note: {singleJudge.curator_note}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onAdopt(singleJudge, source)}
+                  style={{
+                    width: "100%",
+                    background: isKeep ? "#34C759" : "#f4c300",
+                    color: "#121212",
+                    border: "2px solid #ffffff",
+                    padding: "14px",
+                    fontFamily: "Anton",
+                    fontSize: "18px",
+                    cursor: "pointer",
+                    boxShadow: "3px 3px 0px #ffffff"
+                  }}
+                >
+                  ➔ INSTANTLY ADOPT {judgeLabel.toUpperCase()} [SPACE / ENTER]
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
 
-      <button
-        onClick={onEnterOverride}
-        style={{
-          background: "#262626",
-          color: "#f4c300",
-          border: "1px solid #f4c300",
-          padding: "12px",
-          fontFamily: "Anton",
-          fontSize: "16px",
-          cursor: "pointer",
-          marginTop: "8px",
-          boxShadow: "2px 2px 0px #f4c300"
-        }}
-      >
-        MANUAL OVERRIDE [O]
-      </button>
+      {/* 4. STATE NONE: NEITHER AI HAS EVALUATED */}
+      {!hasJ4 && !hasJ5 && (
+        <div
+          style={{
+            background: "#1c1b1b",
+            border: "2px solid #555",
+            padding: "20px",
+            textAlign: "center"
+          }}
+        >
+          <div style={{ fontSize: "18px", color: "#f4c300", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "8px" }}>
+            NO AI PRE-JUDGEMENT AVAILABLE
+          </div>
+          <p style={{ color: "#aaa", fontSize: "13px", margin: "0 0 16px 0" }}>
+            This meme has not been pre-evaluated by AI Judge 4 or Judge 5. Please curate manually.
+          </p>
+          <button
+            type="button"
+            onClick={onEnterOverride}
+            style={{
+              background: "#9b30ff",
+              color: "#ffffff",
+              border: "2px solid #f4c300",
+              padding: "10px 20px",
+              fontFamily: "Anton",
+              fontSize: "16px",
+              cursor: "pointer",
+              boxShadow: "3px 3px 0px #f4c300"
+            }}
+          >
+            OPEN MANUAL CURATION [O]
+          </button>
+        </div>
+      )}
+
+      {/* Action Buttons Row: Manual Override & FORCE REMOVE */}
+      <div style={{ display: "flex", gap: "12px", marginTop: "4px" }}>
+        <button
+          type="button"
+          onClick={onEnterOverride}
+          style={{
+            flex: 1,
+            background: "#222222",
+            color: "#f4c300",
+            border: "1px solid #f4c300",
+            padding: "12px",
+            fontFamily: "Anton",
+            fontSize: "15px",
+            cursor: "pointer",
+            boxShadow: "2px 2px 0px #f4c300",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px"
+          }}
+          title="Switch to manual curation [Key: O]"
+        >
+          <span>✏️</span>
+          <span>MANUAL OVERRIDE [O]</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onForceRemove}
+          style={{
+            flex: 1,
+            background: "#380d0d",
+            color: "#FF3B30",
+            border: "1px solid #FF3B30",
+            padding: "12px",
+            fontFamily: "Anton",
+            fontSize: "15px",
+            cursor: "pointer",
+            boxShadow: "2px 2px 0px #FF3B30",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px"
+          }}
+          title="Permanently remove invalid non-meme from R2 and database [Key: Shift+Delete]"
+        >
+          <span>🗑️</span>
+          <span>FORCE REMOVE [SHIFT+DEL]</span>
+        </button>
+      </div>
     </div>
   );
 }

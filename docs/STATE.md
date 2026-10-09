@@ -50,6 +50,8 @@ The legacy prototype landing UI (`src/App.tsx`, `src/styles.css`) has been perma
   - `/api/admin/analytics/*`: Ranking recalculation, trend analysis, overview metrics, and algorithm reset challenges.
 - **Curation & Consensus APIs (`functions/api/curate/`)**:
   - `/api/curate/list`, `/api/curate/next`, `/api/curate/save`, `/api/curate/stats`: Multi-judge voting operations.
+  - `/api/curate/approve`: Atomic single-judge adoption and authoritative finalization (writes to `meme_curation_final` and `memes`).
+  - `/api/curate/force-remove`: Destructive cleanup endpoint permanently purging non-memes from R2 and D1.
   - `/api/curate/account`: Self-service judge credential management.
   - `/api/curate/ai-presets`: Judge-isolated vision model configurations.
   - `/api/curate/super/*`: SuperAdmin conflict resolution, bulk resolution, and summary stats.
@@ -80,7 +82,7 @@ The database `meme-capsule-db` (SQLite at the edge) operates under 13 sequential
 - Media synchronization engine in `/admin` ensuring D1 metadata matches physical R2 storage objects.
 
 ### D. Internal Frontend Workbenches (`src/`)
-- **`/curate`**: Multi-judge consensus curation dashboard with keyboard shortcuts (`K`, `E`, `D`, `L`), Superadmin conflict arbitration (`CuratorResolveModal`), batch resolution, judge account management, judge-isolated AI presets, AES-GCM-256 encrypted API keys, and CSV/JSON export. Deeply integrates the **AI-Judgement Review Workflow** (States A/B/C) with AI Judges 4 and 5.
+- **`/curate`**: Multi-judge consensus curation dashboard with keyboard shortcuts (`K`, `X`, `D`, `R`), fast-approval of AI Consensus (`Space`/`Enter`), instant single-AI adoption, authoritative single-judge finality (`POST /api/curate/approve`), destructive Force Remove (`Shift+Delete` / `POST /api/curate/force-remove`), Superadmin dashboard view, judge account management, judge-isolated AI presets, and CSV/JSON export. Deeply integrates the **AI-Judgement Review Workflow** with AI Judges 4 and 5.
 - **`/admin`**: Administration console with D1 SQL console, R2 media sync, 5-metric status bar, CSV/Excel export, analytics algorithm tuning, and dark mode.
 - **`/categorise`**: Multi-topic taxonomy tagging, tone labeling, and humor mechanism tagging.
 - **`/ai-judge`**: Multimodal AI pre-curator loop powered by NVIDIA NIM Llama 3.2 Vision and universal vision models.

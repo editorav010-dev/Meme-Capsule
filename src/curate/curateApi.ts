@@ -63,6 +63,35 @@ export async function saveCuration(payload: {
   return handleResponse(res);
 }
 
+export async function approveCuration(payload: {
+  meme_id: string;
+  corpus_status: CorpusStatus;
+  duplicate_of?: string | null;
+  topics?: string[];
+  tone?: string | null;
+  humour_mechanisms?: string[];
+  curator_note?: string | null;
+  user_id?: string;
+  user_name?: string;
+  adopted_from?: "judge4" | "judge5" | "consensus" | "manual";
+}): Promise<{ success: boolean; meme_id: string; is_final: boolean }> {
+  const res = await fetch("/api/curate/approve", {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload)
+  });
+  return handleResponse(res);
+}
+
+export async function forceRemoveMeme(memeId: string): Promise<{ success: boolean; meme_id: string; message: string }> {
+  const res = await fetch("/api/curate/force-remove", {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ meme_id: memeId })
+  });
+  return handleResponse(res);
+}
+
 export async function fetchCurationStats(): Promise<CurationStatsResponse> {
   const res = await fetch("/api/curate/stats", {
     headers: getAuthHeaders(),

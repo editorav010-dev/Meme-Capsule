@@ -178,7 +178,10 @@ The platform enforces a canonical single-source-of-truth contract across `memes`
    - Superadmin Command Center reports **111 Authoritative Resolved** memes with a dedicated badge for **53 Excluded**.
    - `/admin` top stats bar displays **Total (5,111)**, **Active (111)**, **Excluded (53)**, **Archived (4,947)**, and **Drafts (0)**.
    - Filtering by `[EXCLUDED]` in `/admin` renders the 53 rejected items with bright red `EXCLUDED` badges, distinct from general backlog items.
-4. **Migrations**:
+4. **Single-Judge Adoption & Force Remove Workflows**:
+   - **`POST /api/curate/approve`**: Any human judge (Judge 1, 2, or 3) adopting an AI decision or finalizing a curation writes atomically to both `meme_curation` (audit log) and `meme_curation_final` (authoritative decision), automatically updating `memes` (`is_active`, `status`, `curation_status`, `tags`, `category`) without needing SuperAdmin arbitration.
+   - **`POST /api/curate/force-remove` (`Shift+Delete`)**: Allows curators to permanently vanish non-meme / invalid media from the R2 storage bucket and all D1 tables (`memes`, `meme_curation`, `meme_curation_final`, `ai_curation_predictions`) in a single non-undoable operation.
+5. **Migrations**:
    - **Migration 011 (`011_reconcile_active_and_curation_sync.sql`)**: Eliminated drift by enforcing $\text{status} = \text{'active'} \iff \text{is\_active} = 1$.
    - **Migration 012 (`012_add_curation_status_to_memes.sql`)**: Added `curation_status` column to `memes`, backfilling `'keep'` (111) and `'excluded'` (53) from `meme_curation_final` while leaving uncurated backlog items as `NULL`. Automatically maintained on all future superadmin single and bulk resolutions.
 

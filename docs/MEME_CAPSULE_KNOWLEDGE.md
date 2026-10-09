@@ -9,9 +9,9 @@
 > **Official Web Platform:** [https://memecapsule.wtf](https://memecapsule.wtf) (Vite / React Multi-Page Static Prerendered)  
 > **Serverless Edge Backend:** [https://meme-capsule-eww.pages.dev](https://meme-capsule-eww.pages.dev) (Cloudflare Pages, D1 SQLite, R2 CDN)  
 > **Project Team & Engineering Leadership:**  
-> - **Anmol Verma** (`editorav010-dev`): Lead Backend Developer — Full backend engineering, serverless architecture, core algorithms, AI tools implementation, security, curation systems, and all internal backend workbenches.  
-> - **Pratham Pandey** (`bbethical010-glitch`): Lead Frontend Developer & Original Ideator — Founding concept, frontend landing pages, Android APK development, app theme, typography, UI/UX, Java Android bridge, and client-side integrations.  
-> - **Faraz Ahmed**: Social Media & Marketing Lead — Social media management, content planning, niche analysis, scripting, and marketing campaigns.  
+> - **Anmol Verma** (`editorav010-dev` / `anmolverma.env@gmail.com`): Lead Backend Developer — Full backend engineering, serverless architecture, core algorithms, AI tools implementation, security, curation systems, and all internal backend workbenches.  
+> - **Pratham Pandey** (`bbethical010-glitch` / `bbethical010@gmail.com`): Lead Frontend Developer & Original Ideator — Founding concept, frontend landing pages, Android APK development, app theme, typography, UI/UX, Java Android bridge, and client-side integrations.  
+> - **Faraz Ahmed** (`thesplashsnize@gmail.com`): Social Media & Marketing Lead — Social media management, content planning, niche analysis, scripting, and marketing campaigns.  
 > **Official App Email (User Support & Marketing):** `support@memecapsule.wtf`  
 > **Official Social Media:**  
 > Instagram: https://www.instagram.com/capsule.meme/ | X: https://x.com/memecapsule_ | Threads: https://www.threads.com/@capsule.meme  
@@ -179,7 +179,7 @@ Any meme that is unfinalized, in judging, or excluded is mathematically impossib
 
 Meme Capsule is a three-person collaborative project with a clear division of architectural, consumer-facing, and marketing responsibilities:
 
-- **Anmol Verma** (Lead Backend Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev)):
+- **Anmol Verma** (Lead Backend Developer — GitHub: [`editorav010-dev`](https://github.com/editorav010-dev), Email: `anmolverma.env@gmail.com`):
   - Full backend engineering & Cloudflare Pages Functions serverless architecture
   - Backend architecture and systems implementation
   - Core algorithms: randomization, deduplication, 3-tier curation status partitioning, and edge ranking
@@ -189,7 +189,7 @@ Meme Capsule is a three-person collaborative project with a clear division of ar
   - Admin, SuperAdmin, and all internal backend workbenches (/admin, /curate, /categorise, /reports, /ai-judge)
   - The underlying technical and mathematical logic behind the Meme Capsule delivery engine
 
-- **Pratham Pandey** (Lead Frontend Developer & Original Ideator — GitHub: [`bbethical010-glitch`](https://github.com/bbethical010-glitch)):
+- **Pratham Pandey** (Lead Frontend Developer & Original Ideator — GitHub: [`bbethical010-glitch`](https://github.com/bbethical010-glitch), Email: `bbethical010@gmail.com`):
   - **Original concept, initial vision, and founding idea behind Meme Capsule**
   - Frontend landing pages and promotional web platform (memecapsule.wtf)
   - Public Android mobile application development (`com.meme.capsule` via Capacitor 8, React 19, Tailwind CSS v4)
@@ -198,7 +198,7 @@ Meme Capsule is a three-person collaborative project with a clear division of ar
   - Java Android bridge (`MainActivity.java`) and Android MediaStore integrations
   - Consumer-facing frontend engineering, animations, and client build setup
 
-- **Faraz Ahmed** (Social Media & Marketing Lead):
+- **Faraz Ahmed** (Social Media & Marketing Lead — Email: `thesplashsnize@gmail.com`):
   - Management of all official Meme Capsule social media handles
   - Content planning, niche analysis, and editorial quality control of all social content
   - Scripting, brand voice, and campaign copywriting
@@ -480,22 +480,27 @@ To prevent mixing rejected memes with uncurated backlog items, Migration 012 int
 - Media assets (WebP, JPEG, PNG, GIF, MP4) reside in Cloudflare R2 bucket `memes`.
 - Serves content publicly with **zero egress bandwidth charges**, edge caching, and high availability.
 
-### 5.4 Multi-Judge Consensus & Layer 0 Keyboard Curation (`/curate`, `/categorise`)
-Designed for rapid, high-volume human evaluation. Curators use Layer 0 keyboard shortcuts:
-- `K`: **Keep** (Approved for public delivery).
-- `E`: **Exclude** (Archived; hidden from public drops).
-- `D`: **Duplicate** (Flag as duplicate with target ID).
-- `L`: **Review Later** (Deferred to secondary review queue).
-- `1-9, 0, -, =`: Toggle topic taxonomy.
-- `Q, W, E, A, S, F`: Select humor tone.
-- `Z, C, V, B, N, M, J, P, O`: Select humor mechanisms.
-- `Cmd/Ctrl + Z`: Instant undo last curation decision.
+### 5.4 Multi-Judge Consensus, AI-Judgement Review & Layer 0 Keyboard Curation (`/curate`, `/categorise`)
+Designed for rapid, high-volume evaluation. Curators (Judges 1, 2, 3) review memes pre-evaluated by offline AI models (AI Judges 4 & 5):
 
 **AI-Judgement Review Workflow for Human Judges (Judges 1, 2, 3):**
-The curation interface now deeply integrates offline AI predictions from `user-judge4` and `user-judge5`.
-- **State A (AI Consensus):** Both AIs agree (e.g., both Keep or both Exclude). Curators can press `Enter` or `Space` to fast-approve the consensus.
-- **State B (AI Disagreement):** The AIs disagree. Curators are presented with AI 4 and AI 5's differing analyses and must explicitly choose `4` (Adopt Judge 4), `5` (Adopt Judge 5), or `O` (Override manually).
-- **State C (Needs Eyes / Partial AI):** One or both AI judgements are missing. Curators use the manual `O` (Override) mode to curate from scratch.
+- **State A (AI Consensus):** When AI Judge 4 and AI Judge 5 agree (both Keep or both Exclude), the human judge can press `Space` or `Enter` to fast-approve the consensus in a single stroke. If taxonomy details differ, pressing `4` adopts Judge 4, pressing `5` adopts Judge 5, or `Space/Enter` adopts Judge 4 by default.
+- **State B (AI Disagreement):** When AI Judge 4 and AI Judge 5 reach conflicting conclusions, both decisions are displayed side-by-side with hotkeys: `4` (Adopt Judge 4), `5` (Adopt Judge 5), or `O` (Manual Override).
+- **Single AI Ready:** When only one AI has completed evaluation, human judges can press `Space` or `Enter` to instantly adopt the available evaluation without roadblock.
+- **Authoritative Single-Judge Finality (`POST /api/curate/approve`):** Any single human judge adoption or manual approval is authoritative and immediately final: it writes to `meme_curation`, writes to `meme_curation_final`, and synchronizes `memes` (`is_active`, `status`, `curation_status`, `tags`, `category`) in an atomic transaction. Memes do not require SuperAdmin arbitration.
+- **Force Remove (`Shift+Delete` / `POST /api/curate/force-remove`):** For non-meme / invalid media in the corpus, pressing `Shift+Delete` or clicking `FORCE REMOVE` permanently vanishes the file from R2 media storage and purges all records across D1 tables (`memes`, `meme_curation`, `meme_curation_final`, `ai_curation_predictions`, etc.). This destructive action is non-undoable.
+- **Layer 0 Keyboard Curation (Override Mode `[O]`):**
+  - `K`: **Keep** (Approved for public delivery).
+  - `X`: **Exclude** (Archived; hidden from public drops).
+  - `D`: **Duplicate** (Flag as duplicate with target ID).
+  - `R`: **Review Later** (Deferred to secondary review queue).
+  - `1-9, 0, -, =`: Toggle topic taxonomy (Max 3).
+  - `Q, W, E, A, S, F`: Select humor tone (1 dominant).
+  - `Z, C, V, B, N, M, J, P, O`: Select humor mechanisms (Max 2).
+  - `Space / Enter`: Save & Advance.
+  - `Esc`: Return from manual override to AI review view.
+  - `Cmd/Ctrl + Z` or `U`: Instant undo last curation decision.
+
 
 ### 5.5 SuperAdmin Arbitration & Authoritative Active Synchronization
 When judges diverge in their votes, the meme surfaces in the **SuperAdmin Command Center**:
@@ -694,11 +699,11 @@ PACKAGE ID: com.meme.capsule
 CURRENT ANDROID VERSION: v2.7 (versionCode 18)
 OFFICIAL WEBSITES: https://memecapsule.wtf (Web Platform) | https://meme-capsule-eww.pages.dev (Edge Backend)
 DEVELOPERS & LEADERSHIP:
-- Anmol Verma (GitHub: editorav010-dev)
+- Anmol Verma (anmolverma.env@gmail.com / GitHub: editorav010-dev)
   Lead Backend Developer: Full backend engineering, serverless architecture, core algorithms, AI tools, security, curation, and all admin systems.
-- Pratham Pandey (GitHub: bbethical010-glitch)
+- Pratham Pandey (bbethical010@gmail.com / GitHub: bbethical010-glitch)
   Lead Frontend Developer & Original Ideator: Founding concept, APK, web platform (memecapsule.wtf), app theme, typography, UI/UX, Java Android bridge, MediaStore integrations, client build setup.
-- Faraz Ahmed
+- Faraz Ahmed (thesplashsnize@gmail.com)
   Social Media & Marketing Lead: Social handles, content planning, niche analysis, scripting, quality control, and marketing campaigns.
 Official App Email (User Support & Marketing): support@memecapsule.wtf
 Social Media:

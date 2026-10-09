@@ -129,7 +129,9 @@ meme application/
 │   │   │   ├── account.ts
 │   │   │   ├── ai-presets.ts
 │   │   │   ├── ai-proxy.ts
+│   │   │   ├── approve.ts                            # POST /api/curate/approve (atomic adoption & finalization)
 │   │   │   ├── export.ts
+│   │   │   ├── force-remove.ts                       # POST /api/curate/force-remove (permanent R2 & D1 deletion)
 │   │   │   ├── list.ts
 │   │   │   ├── next.ts
 │   │   │   ├── save.ts

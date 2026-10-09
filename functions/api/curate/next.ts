@@ -114,16 +114,16 @@ const SELECT_COLUMNS = `
   m.image_url,
   m.storage_path,
 
-  c.corpus_status,
-  c.duplicate_of,
-  c.topics,
-  c.tone,
-  c.humour_mechanisms,
-  c.curator_note,
-  c.user_id,
-  c.user_name,
-  c.reviewed_at,
-  c.updated_at,
+  COALESCE(c.corpus_status, mcf.corpus_status) AS corpus_status,
+  COALESCE(c.duplicate_of, mcf.duplicate_of) AS duplicate_of,
+  COALESCE(c.topics, mcf.topics) AS topics,
+  COALESCE(c.tone, mcf.tone) AS tone,
+  COALESCE(c.humour_mechanisms, mcf.humour_mechanisms) AS humour_mechanisms,
+  COALESCE(c.curator_note, mcf.curator_note) AS curator_note,
+  COALESCE(c.user_id, mcf.resolved_by) AS user_id,
+  COALESCE(c.user_name, mcf.resolved_by) AS user_name,
+  COALESCE(c.reviewed_at, mcf.resolved_at) AS reviewed_at,
+  COALESCE(c.updated_at, mcf.updated_at) AS updated_at,
 
   ai.topics            AS ai_topics,
   ai.corpus_status     AS ai_corpus_status,
@@ -168,9 +168,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       totalMemesCache = { count: total, expiresAt: now + TOTAL_CACHE_TTL_MS };
     }
 
-    const reviewedCountRes = await env.DB.prepare(
-      "SELECT COUNT(*) as cnt FROM meme_curation WHERE user_id = ?"
-    ).bind(userId).first<{ cnt: number }>();
+    const reviewedCountRes = await env.DB.prepare(`
+      SELECT COUNT(DISTINCT m.id) as cnt FROM memes m
+      WHERE EXISTS (SELECT 1 FROM meme_curation c WHERE c.meme_id = m.id AND c.user_id = ?)
+         OR EXISTS (SELECT 1 FROM meme_curation_final mcf WHERE mcf.meme_id = m.id)
+    `).bind(userId).first<{ cnt: number }>();
 
     const reviewed = reviewedCountRes?.cnt ?? 0;
     const remaining = Math.max(0, total - reviewed);
@@ -179,15 +181,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     let whereClause = "WHERE 1=1";
 
     if (filter === "unreviewed") {
-      whereClause += " AND c.corpus_status IS NULL";
+      whereClause += " AND c.corpus_status IS NULL AND mcf.corpus_status IS NULL";
     } else if (filter === "review_later") {
-      whereClause += " AND c.corpus_status = 'review_later'";
+      whereClause += " AND (c.corpus_status = 'review_later' OR mcf.corpus_status = 'review_later')";
     } else if (filter === "keep") {
-      whereClause += " AND c.corpus_status = 'keep'";
+      whereClause += " AND (c.corpus_status = 'keep' OR mcf.corpus_status = 'keep')";
     } else if (filter === "excluded") {
-      whereClause += " AND c.corpus_status = 'excluded'";
+      whereClause += " AND (c.corpus_status = 'excluded' OR mcf.corpus_status = 'excluded')";
     } else if (filter === "duplicate") {
-      whereClause += " AND c.corpus_status = 'duplicate'";
+      whereClause += " AND (c.corpus_status = 'duplicate' OR mcf.corpus_status = 'duplicate')";
     }
 
     let targetMeme: MemeRow | null = null;
@@ -213,6 +215,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           LEFT JOIN meme_curation c
             ON m.id = c.meme_id
            AND c.user_id = ?
+          LEFT JOIN meme_curation_final mcf
+            ON m.id = mcf.meme_id
           LEFT JOIN ai_curation_predictions ai
             ON m.id = ai.meme_id
           ${whereClause}
@@ -232,6 +236,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         LEFT JOIN meme_curation c
           ON m.id = c.meme_id
          AND c.user_id = ?
+        LEFT JOIN meme_curation_final mcf
+          ON m.id = mcf.meme_id
         LEFT JOIN ai_curation_predictions ai
           ON m.id = ai.meme_id
         ${whereClause}
