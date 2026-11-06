@@ -21,18 +21,23 @@ export default function BatchDeleteModal({
 }: BatchDeleteModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [purgeStage, setPurgeStage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const handleConfirmPurge = async () => {
     setIsDeleting(true);
+    setPurgeStage("Dispatching batch purge to Cloudflare D1 & R2...");
     setError(null);
     try {
-      await deleteIngestionBatch(adminToken, batchId);
+      setPurgeStage("Purging R2 storage objects in parallel chunks...");
+      const result = await deleteIngestionBatch(adminToken, batchId);
+      setPurgeStage("Purge complete! Synchronizing...");
       onDeleted(batchId);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to purge batch.");
       setIsDeleting(false);
+      setPurgeStage("");
     }
   };
 
@@ -158,6 +163,12 @@ export default function BatchDeleteModal({
               <p style={{ margin: 0, fontSize: "12px", color: "#aaa" }}>
                 All draft media and records for <code style={{ color: "#fff" }}>{batchId}</code> will be removed from Cloudflare R2 and D1 immediately.
               </p>
+              {isDeleting && (
+                <div style={{ padding: "10px", background: "#ff336615", border: "1px dashed #ff3366", color: "#ffe600", fontSize: "11px", fontFamily: "monospace", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="material-symbols-outlined" style={{ animation: "spin 1s linear infinite", fontSize: "16px" }}>sync</span>
+                  <span>{purgeStage}</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", borderTop: "2px solid #333", paddingTop: "14px" }}>
@@ -196,3 +207,4 @@ export default function BatchDeleteModal({
     </div>
   );
 }
+

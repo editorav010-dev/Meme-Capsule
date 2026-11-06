@@ -422,14 +422,13 @@ export default function BulkIngestionWorkspace({
   };
 
   const uploadOne = useCallback(async (statusItem: IngestionItemStatus, currentItems: BulkDraftItem[]) => {
-    let currentStatus: IngestionBatchStatus | null = null;
     const local = currentItems.find((item) => item.clientItemId === statusItem.idempotency_key);
     if (statusItem.upload_state !== "uploaded") {
       if (!local?.file) {
         onNotice(`${local?.fileName || statusItem.original_filename} needs to be re-selected before it can be retried.`);
         return;
       }
-      currentStatus = await uploadIngestionItem(
+      const receipt = await uploadIngestionItem(
         adminToken,
         statusItem.batch_id,
         statusItem.job_id,
@@ -441,44 +440,72 @@ export default function BulkIngestionWorkspace({
           const totalLoaded = completedUploadBytesRef.current + activeBytes;
 
           const now = Date.now();
+          const elapsed = (now - uploadStartTimeRef.current) / 1000;
+          const overallRate = elapsed > 0.5 ? totalLoaded / elapsed : 0;
+
           const lastSample = lastSampleRef.current;
           const dt = (now - lastSample.time) / 1000;
-          if (dt >= 0.25 || lastSample.time === 0) {
+          if (dt >= 0.5 || lastSample.time === 0) {
             const dBytes = totalLoaded - lastSample.loaded;
             const instantSpeed = dt > 0 ? Math.max(0, dBytes / dt) : 0;
             const smoothed = smoothedSpeedRef.current === 0
               ? instantSpeed
-              : 0.25 * instantSpeed + 0.75 * smoothedSpeedRef.current;
+              : 0.15 * instantSpeed + 0.85 * smoothedSpeedRef.current;
             smoothedSpeedRef.current = smoothed;
             lastSampleRef.current = { time: now, loaded: totalLoaded };
           }
 
+          // Blend smoothed instantaneous speed (60%) with session overall rate (40%) to eliminate erratic jumping
+          const blendedSpeed = smoothedSpeedRef.current > 0 && overallRate > 0
+            ? 0.6 * smoothedSpeedRef.current + 0.4 * overallRate
+            : Math.max(smoothedSpeedRef.current, overallRate);
+
           const remainingBytes = Math.max(0, totalTargetBytesRef.current - totalLoaded);
-          const eta = smoothedSpeedRef.current > 1024 ? Math.ceil(remainingBytes / smoothedSpeedRef.current) : 0;
+          const eta = blendedSpeed > 1024 ? Math.ceil(remainingBytes / blendedSpeed) : 0;
           setUploadTelemetry({
             bytesUploaded: totalLoaded,
             totalBytes: totalTargetBytesRef.current,
-            speedBps: smoothedSpeedRef.current,
+            speedBps: blendedSpeed,
             etaSeconds: eta,
             isActive: true,
             isComplete: false
           });
         }
       );
+
       completedUploadBytesRef.current += local.file.size;
       activeUploadBytesRef.current.delete(statusItem.job_id);
-      applyStatus(currentStatus);
+
+      // Fast O(1) state update: Mark this specific item uploaded without refetching the entire batch
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.clientItemId === statusItem.idempotency_key || it.server?.job_id === statusItem.job_id) {
+            return {
+              ...it,
+              server: {
+                ...(it.server || statusItem),
+                upload_state: "uploaded",
+                storage_path: receipt.storage_path || it.server?.storage_path || null,
+                url: receipt.url || it.server?.url || it.previewUrl
+              }
+            };
+          }
+          return it;
+        })
+      );
+
       // Clean completed binary from local IndexedDB
       await removeIntakeBlob(statusItem.idempotency_key).catch(() => undefined);
+
       // Reactively notify parent to increment top-level collection counters immediately
       if (onMemeIngested) {
         onMemeIngested({
-          id: statusItem.meme_id,
+          id: receipt.meme_id || statusItem.meme_id,
           title: statusItem.title || statusItem.original_filename
         });
       }
     }
-  }, [adminToken, applyStatus, onNotice, onMemeIngested]);
+  }, [adminToken, onNotice, onMemeIngested]);
 
   const uploadBatchFiles = async (status: IngestionBatchStatus) => {
     const pendingUploads = status.items.filter((item) => item.upload_state !== "uploaded");
@@ -511,21 +538,26 @@ export default function BulkIngestionWorkspace({
       const latestStatus = await refreshBatch(status.batch.id).catch(() => batchStatusRef.current || status);
       const uploaded = latestStatus?.items.filter((it) => it.upload_state === "uploaded").length || 0;
       const total = latestStatus?.items.length || status.items.length;
+      const failed = latestStatus?.items.filter((it) => it.upload_state === "failed").length || 0;
+
+      const isAllDone = uploaded === total || (uploaded > 0 && failed === 0);
 
       // STICKY CONFIRMATION - stays permanently visible after completion
       setUploadTelemetry((prev) => ({
         ...prev,
-        bytesUploaded: prev.totalBytes,
+        bytesUploaded: isAllDone ? prev.totalBytes : completedUploadBytesRef.current,
         speedBps: 0,
         etaSeconds: 0,
         isActive: true,
-        isComplete: true
+        isComplete: isAllDone
       }));
 
       if (uploaded === total) {
         onNotice(`✓ All ${total} memes successfully uploaded to Cloudflare R2 and registered as Drafts in D1.`);
+      } else if (failed > 0) {
+        onNotice(`${uploaded} of ${total} memes uploaded. ${failed} network file(s) failed and can be retried.`);
       } else {
-        onNotice(`${uploaded} of ${total} memes uploaded. Any failed network files can be retried.`);
+        onNotice(`${uploaded} of ${total} memes uploaded.`);
       }
 
       await onBackendChanged();
@@ -534,32 +566,21 @@ export default function BulkIngestionWorkspace({
     return status;
   };
 
-  const handleConflictResolve = (
-    clientItemId: string,
-    resolution: ConflictResolution,
-    applyToRemaining: boolean
-  ) => {
-    setItems((current) => {
-      let targetSeen = false;
-      return current.map((item) => {
-        if (item.clientItemId === clientItemId) {
-          targetSeen = true;
+  const handleBatchConflictResolve = (resolutions: Record<string, ConflictResolution>) => {
+    setItems((current) =>
+      current.map((item) => {
+        const res = resolutions[item.clientItemId];
+        if (res) {
           return {
             ...item,
-            resolution,
-            replaceMemeId: resolution === "replace_existing" ? item.duplicateConflict?.existingMemeId : undefined
-          };
-        }
-        if (applyToRemaining && targetSeen && (item.duplicateConflict || item.duplicateWarning) && !item.resolution) {
-          return {
-            ...item,
-            resolution,
-            replaceMemeId: resolution === "replace_existing" ? item.duplicateConflict?.existingMemeId : undefined
+            resolution: res,
+            replaceMemeId: res === "replace_existing" ? item.duplicateConflict?.existingMemeId : undefined
           };
         }
         return item;
-      });
-    });
+      })
+    );
+    setShowConflictModal(false);
   };
 
   const handleCancelBatch = async () => {
@@ -854,6 +875,145 @@ export default function BulkIngestionWorkspace({
         <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/heic,image/heif,.heic,.heif,.bmp" multiple hidden onChange={(event) => { void addFiles(event.target.files || []); event.target.value = ""; }} />
       </div>
 
+      {/* Primary Action Controls Bar — Positioned prominently directly below Drag & Drop Portal */}
+      <div
+        className="brutalist-border-sm"
+        style={{
+          background: "#161616",
+          border: "2px solid #333",
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+          marginTop: "12px",
+          marginBottom: "12px"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {!submitted ? (
+            <>
+              <button
+                type="button"
+                className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive"
+                disabled={isWorking || !canConfirmBulk(items) || totalBytes > BULK_MAX_BATCH_BYTES || !backendMode || conflictedItems.length > 0}
+                onClick={() => void confirmBatch()}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: "13px",
+                  fontWeight: 900,
+                  letterSpacing: "0.5px"
+                }}
+              >
+                {isWorking
+                  ? "Uploading…"
+                  : `Confirm & Upload Batch (${items.filter((i) => i.resolution !== "keep_existing").length} Files)`}
+              </button>
+
+              {conflictedItems.length > 0 && (
+                <button
+                  type="button"
+                  className="brutalist-border-sm brutalist-shadow-black"
+                  style={{
+                    padding: "10px 16px",
+                    background: "#ff3366",
+                    color: "#fff",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12px"
+                  }}
+                  onClick={() => setShowConflictModal(true)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>warning</span>
+                  Resolve Conflicts ({conflictedItems.length})
+                </button>
+              )}
+
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  className="brutalist-border-sm bulk-secondary-button"
+                  style={{ padding: "10px 14px", fontSize: "12px" }}
+                  onClick={() => {
+                    items.forEach((item) => {
+                      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+                    });
+                    setItems([]);
+                    void clearAllIntakeBlobs().catch(() => undefined);
+                    saveSession(null, []);
+                  }}
+                  disabled={isWorking}
+                >
+                  Clear Staged Files
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive"
+                disabled={isWorking}
+                onClick={startNewBatch}
+                style={{ padding: "10px 18px", fontSize: "12px", fontWeight: 800 }}
+              >
+                Start Fresh Batch
+              </button>
+              {onOpenVault && (
+                <button
+                  type="button"
+                  className="brutalist-border-sm bulk-secondary-button"
+                  style={{ borderColor: "var(--primary, #00f0ff)", color: "var(--primary, #00f0ff)", fontWeight: 700, padding: "10px 14px", fontSize: "12px" }}
+                  onClick={onOpenVault}
+                  title="View newly ingested drafts in the Meme Vault"
+                >
+                  Open Drafts in Meme Vault ↗
+                </button>
+              )}
+              {failedUploadItems.length > 0 && (
+                <button
+                  type="button"
+                  className="brutalist-border-sm bulk-retry-button"
+                  disabled={isWorking}
+                  onClick={() => void retryFailedUploads()}
+                  style={{ padding: "10px 14px", fontSize: "12px" }}
+                >
+                  Retry Failed Uploads ({failedUploadItems.length})
+                </button>
+              )}
+              <button
+                type="button"
+                className="brutalist-border-sm bulk-retry-button"
+                style={{ background: "var(--danger, #ff3366)", color: "#fff", padding: "10px 14px", fontSize: "12px" }}
+                disabled={isWorking}
+                onClick={() => void purgeCurrentBatch()}
+              >
+                🗑️ Purge Batch
+              </button>
+            </>
+          )}
+        </div>
+
+        <div style={{ fontSize: "12px", fontFamily: "monospace", color: "#aaa" }}>
+          {items.length === 0 ? (
+            <span>No files staged</span>
+          ) : (
+            <span>
+              <strong style={{ color: "#fff" }}>{items.length}</strong> items ready ({formatBytes(totalBytes)})
+              {conflictedItems.length > 0 && (
+                <span style={{ color: "#ff6688", marginLeft: "8px" }}>
+                  • {conflictedItems.length} conflict(s)
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
       {isRestoring && <p className="bulk-progress-note">Restoring saved server progress and binary cache from IndexedDB…</p>}
       {isCheckingDuplicates && <p className="bulk-progress-note" style={{ color: "#ffe600" }}>Checking duplicate hashes against live D1 collection…</p>}
       {invalidCount > 0 && <p className="bulk-error-summary" role="alert">{invalidCount} file{invalidCount === 1 ? "" : "s"} need attention before confirmation.</p>}
@@ -1092,7 +1252,7 @@ export default function BulkIngestionWorkspace({
     {showConflictModal && conflictedItems.length > 0 && (
       <DuplicateConflictModal
         conflictedItems={conflictedItems}
-        onResolve={handleConflictResolve}
+        onResolveBatch={handleBatchConflictResolve}
         onCancelBatch={() => void handleCancelBatch()}
         onClose={() => setShowConflictModal(false)}
       />

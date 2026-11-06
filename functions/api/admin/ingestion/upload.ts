@@ -132,9 +132,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       } else {
         await ensurePrivateMeme(env, job);
       }
-      await refreshBatchStatus(env.DB, batchId);
-      const status = await getBatchStatus(env, batchId);
-      return status ? json(status) : json({ error: "Batch could not be read after upload recovery." }, { status: 503 });
+      return json({
+        success: true,
+        job_id: jobId,
+        meme_id: job.meme_id,
+        upload_state: "uploaded",
+        storage_path: job.storage_path,
+        url: toPublicUrl(env, job.storage_path)
+      });
     }
 
     const fileValue = formData?.get("file") as UploadFile | string | null;
@@ -229,9 +234,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }, { status: 503 });
     }
 
-    await refreshBatchStatus(env.DB, batchId);
-    const status = await getBatchStatus(env, batchId);
-    return status ? json(status) : json({ error: "Batch could not be read after upload." }, { status: 503 });
+    return json({
+      success: true,
+      job_id: jobId,
+      meme_id: uploadedJob.meme_id,
+      upload_state: "uploaded",
+      storage_path: objectPath,
+      url: toPublicUrl(env, objectPath)
+    });
   } catch (error) {
     if (r2Uploaded && objectPath) {
       const message = boundError(error, "R2 upload succeeded but the upload state could not be finalized.");

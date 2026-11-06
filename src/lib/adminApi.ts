@@ -216,13 +216,32 @@ export const getIngestionBatch = async (adminToken: string, batchId: string) => 
   return parseJsonResponse<IngestionBatchStatus>(response);
 };
 
+export type UploadReceipt = {
+  success: boolean;
+  job_id: string;
+  meme_id: string;
+  upload_state: string;
+  storage_path?: string;
+  url?: string;
+};
+
+export const refreshIngestionBatch = async (adminToken: string, batchId: string) => {
+  const response = await fetch("/api/admin/ingestion/batches", {
+    method: "POST",
+    headers: ingestionHeaders(adminToken, "application/json"),
+    body: JSON.stringify({ action: "refresh_status", batch_id: batchId }),
+    cache: "no-store"
+  });
+  return parseJsonResponse<IngestionBatchStatus>(response);
+};
+
 export const uploadIngestionItem = (
   adminToken: string,
   batchId: string,
   jobId: string,
   file: File,
   onProgress?: (loaded: number, total: number) => void
-): Promise<IngestionBatchStatus & { recoverable?: boolean; storage_path?: string }> => {
+): Promise<UploadReceipt & { recoverable?: boolean; storage_path?: string }> => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/admin/ingestion/upload");

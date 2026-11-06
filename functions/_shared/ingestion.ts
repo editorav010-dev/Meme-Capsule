@@ -232,7 +232,11 @@ export const getIngestionJobState = async (db: D1Database, memeId: string) => {
   return row?.state || null;
 };
 
-export const getBatchStatus = async (env: Env, batchId: string): Promise<IngestionBatchStatus | null> => {
+export const getBatchStatus = async (
+  env: Env,
+  batchId: string,
+  options?: { includeEvaluations?: boolean }
+): Promise<IngestionBatchStatus | null> => {
   const batch = await env.DB.prepare("SELECT * FROM ingestion_batches WHERE id = ?")
     .bind(batchId)
     .first<IngestionBatchRow>();
@@ -244,8 +248,7 @@ export const getBatchStatus = async (env: Env, batchId: string): Promise<Ingesti
   const jobs = jobsResult.results || [];
   const evaluations = new Map<string, IngestionEvaluationRow[]>();
 
-  if (jobs.length > 0) {
-    // Single parameter query via JOIN eliminates SQLite variable limit errors (e.g. batches with 100+ items)
+  if (options?.includeEvaluations && jobs.length > 0) {
     const evaluationResult = await env.DB.prepare(`
       SELECT e.*
       FROM ingestion_ai_evaluations e
@@ -260,24 +263,16 @@ export const getBatchStatus = async (env: Env, batchId: string): Promise<Ingesti
     }
   }
 
-  let storageUsage = { total_bytes: 0, total_files: 0 };
-  try {
-    const statsRow = await env.DB.prepare(
-      "SELECT COUNT(*) as total_files, COALESCE(SUM(byte_size), 0) as total_bytes FROM ingestion_jobs WHERE upload_state = 'uploaded'"
-    ).first<{ total_files: number; total_bytes: number }>();
-    if (statsRow) {
-      storageUsage = {
-        total_files: Number(statsRow.total_files) || 0,
-        total_bytes: Number(statsRow.total_bytes) || 0
-      };
-    }
-  } catch {
-    // Non-blocking fallback if ingestion_jobs does not exist yet
-  }
+  const uploadedJobs = jobs.filter((j) => j.upload_state === "uploaded");
+  const uploadedCount = uploadedJobs.length;
+  const uploadFailedCount = jobs.filter((j) => j.upload_state === "failed").length;
+  const aiFailedCount = jobs.filter((j) => j.state === "failed").length;
+  const totalUploadedBytes = uploadedJobs.reduce((sum, j) => sum + (Number(j.byte_size) || 0), 0);
 
-  const uploadedCount = (jobs || []).filter((j) => j.upload_state === "uploaded").length;
-  const uploadFailedCount = (jobs || []).filter((j) => j.upload_state === "failed").length;
-  const aiFailedCount = (jobs || []).filter((j) => j.state === "failed").length;
+  const storageUsage = {
+    total_files: uploadedCount,
+    total_bytes: totalUploadedBytes
+  };
 
   return {
     batch: {
@@ -342,6 +337,7 @@ export const refreshBatchStatus = async (db: D1Database, batchId: string) => {
       COUNT(*) AS total_items,
       SUM(CASE WHEN upload_state = 'uploaded' THEN 1 ELSE 0 END) AS uploaded_items,
       SUM(CASE WHEN upload_state = 'failed' THEN 1 ELSE 0 END) AS upload_failed_items,
+      SUM(CASE WHEN duplicate_of_job_id IS NOT NULL AND duplicate_of_job_id NOT LIKE 'replace:%' AND upload_state = 'pending' THEN 1 ELSE 0 END) AS skipped_items,
       SUM(CASE WHEN state = 'human_ready' THEN 1 ELSE 0 END) AS ready_items,
       SUM(CASE WHEN state = 'failed' THEN 1 ELSE 0 END) AS ai_failed_items,
       SUM(CASE WHEN upload_state = 'uploading' OR state = 'processing' THEN 1 ELSE 0 END) AS busy_items
@@ -351,6 +347,7 @@ export const refreshBatchStatus = async (db: D1Database, batchId: string) => {
     total_items: number;
     uploaded_items: number;
     upload_failed_items: number;
+    skipped_items: number;
     ready_items: number;
     ai_failed_items: number;
     busy_items: number;
@@ -359,22 +356,26 @@ export const refreshBatchStatus = async (db: D1Database, batchId: string) => {
   const total = Number(counts?.total_items || 0);
   const uploaded = Number(counts?.uploaded_items || 0);
   const uploadFailed = Number(counts?.upload_failed_items || 0);
+  const skipped = Number(counts?.skipped_items || 0);
   const ready = Number(counts?.ready_items || 0);
   const aiFailed = Number(counts?.ai_failed_items || 0);
   const busy = Number(counts?.busy_items || 0);
 
   // Decoupled batch status calculation:
-  // The intake batch status represents whether all items were successfully uploaded into R2 and D1 drafts:
-  // If all uploads succeeded, status is "complete".
-  // An advisory AI evaluation failure must NEVER mark the batch as "failed" or "partial" if uploads succeeded.
-  const status = total > 0 && uploaded === total
+  // If all items to be uploaded were uploaded or accounted for as skipped duplicates, status is "complete".
+  const isAllUploaded = total > 0 && (uploaded + skipped) >= total;
+  const isPartiallyUploaded = uploaded > 0 && (uploaded + skipped + uploadFailed) >= total;
+
+  const status = isAllUploaded
     ? "complete"
     : busy > 0
     ? "processing"
     : uploadFailed === total && total > 0
     ? "failed"
-    : uploadFailed > 0
+    : uploadFailed > 0 || isPartiallyUploaded
     ? "partial"
+    : uploaded > 0
+    ? "processing"
     : "queued";
   const now = new Date().toISOString();
 
@@ -389,6 +390,7 @@ export const refreshBatchStatus = async (db: D1Database, batchId: string) => {
     total_items: total,
     uploaded_items: uploaded,
     upload_failed_items: uploadFailed,
+    skipped_items: skipped,
     ready_items: ready,
     failed_items: uploadFailed,
     ai_failed_items: aiFailed

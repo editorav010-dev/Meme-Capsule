@@ -106,6 +106,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   try {
+    await refreshBatchStatus(env.DB, batchId).catch(() => undefined);
     const status = await getBatchStatus(env, batchId);
     if (!status) return json({ error: "Ingestion batch not found." }, { status: 404 });
     return json(status);
@@ -121,6 +122,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const payload = await parsePayload(request);
+
+    // Refresh Batch Status Action
+    if (payload.action === "refresh_status" && payload.batch_id) {
+      const bId = String(payload.batch_id).trim();
+      await refreshBatchStatus(env.DB, bId).catch(() => undefined);
+      const status = await getBatchStatus(env, bId);
+      return status ? json(status) : json({ error: "Batch not found." }, { status: 404 });
+    }
 
     // Duplicate Check Pre-flight Action
     if (payload.action === "check_duplicates") {
@@ -383,10 +392,9 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
           await env.DB.prepare(`DELETE FROM memes WHERE id IN (${placeholders}) AND status = 'draft' AND is_active = 0`)
             .bind(...chunk).run().catch(() => undefined);
         }
-        for (const job of jobs) {
-          if (job.storage_path) {
-            await env.MEMES_BUCKET.delete(job.storage_path).catch(() => undefined);
-          }
+        const storagePaths = jobs.map((j) => j.storage_path).filter((p): p is string => Boolean(p));
+        for (const chunk of chunkArray(storagePaths, 100)) {
+          await env.MEMES_BUCKET.delete(chunk).catch(() => undefined);
         }
       }
 
@@ -428,10 +436,9 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
         .catch(() => undefined);
     }
 
-    for (const job of jobs) {
-      if (job.storage_path) {
-        await env.MEMES_BUCKET.delete(job.storage_path).catch(() => undefined);
-      }
+    const storagePaths = jobs.map((j) => j.storage_path).filter((p): p is string => Boolean(p));
+    for (const chunk of chunkArray(storagePaths, 100)) {
+      await env.MEMES_BUCKET.delete(chunk).catch(() => undefined);
     }
   }
 
