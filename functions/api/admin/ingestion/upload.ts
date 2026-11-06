@@ -69,6 +69,35 @@ const ensurePrivateMeme = async (env: Env, job: IngestionJobRow) => {
   }
 };
 
+const replaceExistingMemeMedia = async (env: Env, job: IngestionJobRow, targetMemeId: string) => {
+  const existingMeme = await env.DB.prepare(
+    "SELECT id, storage_path, title FROM memes WHERE id = ?"
+  ).bind(targetMemeId).first<{ id: string; storage_path: string | null; title: string | null }>();
+
+  if (!existingMeme) {
+    return ensurePrivateMeme(env, job);
+  }
+
+  const oldStoragePath = existingMeme.storage_path;
+  const now = new Date().toISOString();
+
+  await env.DB.prepare(`
+    UPDATE memes
+    SET storage_path = ?, uploaded_at = ?
+    WHERE id = ?
+  `).bind(job.storage_path, now, targetMemeId).run();
+
+  await env.DB.prepare(`
+    UPDATE ingestion_jobs
+    SET meme_id = ?, state = 'human_ready', completed_at = ?
+    WHERE job_id = ?
+  `).bind(targetMemeId, now, job.job_id).run();
+
+  if (oldStoragePath && oldStoragePath !== job.storage_path) {
+    await env.MEMES_BUCKET.delete(oldStoragePath).catch(() => undefined);
+  }
+};
+
 const markUploadFailure = async (env: Env, jobId: string, message: string) => {
   await env.DB.prepare(`
     UPDATE ingestion_jobs
@@ -97,7 +126,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let r2Uploaded = false;
   try {
     if (job.upload_state === "uploaded" && job.storage_path) {
-      await ensurePrivateMeme(env, job);
+      if (job.duplicate_of_job_id && job.duplicate_of_job_id.startsWith("replace:")) {
+        const targetMemeId = job.duplicate_of_job_id.slice("replace:".length).trim();
+        await replaceExistingMemeMedia(env, job, targetMemeId);
+      } else {
+        await ensurePrivateMeme(env, job);
+      }
       await refreshBatchStatus(env.DB, batchId);
       const status = await getBatchStatus(env, batchId);
       return status ? json(status) : json({ error: "Batch could not be read after upload recovery." }, { status: 503 });
@@ -173,7 +207,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (!uploadedJob) throw new Error("The uploaded ingestion job could not be read back.");
 
     try {
-      await ensurePrivateMeme(env, uploadedJob);
+      if (uploadedJob.duplicate_of_job_id && uploadedJob.duplicate_of_job_id.startsWith("replace:")) {
+        const targetMemeId = uploadedJob.duplicate_of_job_id.slice("replace:".length).trim();
+        await replaceExistingMemeMedia(env, uploadedJob, targetMemeId);
+      } else {
+        await ensurePrivateMeme(env, uploadedJob);
+      }
     } catch (metadataError) {
       const message = boundError(metadataError, "R2 upload succeeded but private D1 metadata could not be saved.");
       await env.DB.prepare(`

@@ -111,4 +111,34 @@ describe("bulk ingestion client validation", () => {
     expect(canConfirmBulk([item])).toBe(false);
     expect(formatBytes(1024)).toBe("1.0 KiB");
   });
+
+  it("blocks batch confirmation when unresolved duplicate conflicts exist", () => {
+    const itemWithConflict: BulkDraftItem = {
+      clientItemId: "item-1",
+      memeId: "intake-1",
+      file: file(),
+      fileName: "duplicate.png",
+      title: "Duplicate Meme",
+      mimeType: "image/png",
+      byteSize: 5000,
+      contentHash: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      previewUrl: "",
+      validationErrors: [],
+      duplicateWarning: "Duplicate in this batch",
+      duplicateConflict: {
+        existingMemeId: "meme-existing-123",
+        matchReason: "Exact SHA-256 Hash Match"
+      }
+    };
+
+    // Unresolved conflict must block confirmation
+    expect(canConfirmBulk([itemWithConflict])).toBe(false);
+
+    // Resolved as keep_existing or replace_existing unlocks confirmation
+    const resolvedSkip = { ...itemWithConflict, resolution: "keep_existing" as const };
+    expect(canConfirmBulk([resolvedSkip])).toBe(true);
+
+    const resolvedReplace = { ...itemWithConflict, resolution: "replace_existing" as const, replaceMemeId: "meme-existing-123" };
+    expect(canConfirmBulk([resolvedReplace])).toBe(true);
+  });
 });

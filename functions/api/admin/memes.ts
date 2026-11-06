@@ -84,7 +84,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (adminError) return adminError;
 
   const url = new URL(request.url);
+  const batchIdFilter = (url.searchParams.get("batch_id") || "").trim();
   const isVaultQuery =
+    Boolean(batchIdFilter) ||
     url.searchParams.has("page") ||
     url.searchParams.has("per_page") ||
     url.searchParams.has("limit") ||
@@ -119,6 +121,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   // Build WHERE conditions and parameters
   const conditions: string[] = [];
   const params: unknown[] = [];
+
+  if (batchIdFilter) {
+    conditions.push("j.batch_id = ?");
+    params.push(batchIdFilter);
+  }
 
   if (q) {
     conditions.push("(LOWER(m.title) LIKE ? OR LOWER(m.id) LIKE ? OR LOWER(m.category) LIKE ? OR LOWER(m.tags) LIKE ?)");
@@ -189,7 +196,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   // 2. Count filtered rows
   let totalCount = 0;
   if (isVaultQuery) {
-    const countSql = `SELECT COUNT(*) as filtered_count FROM memes m LEFT JOIN meme_curation_final f ON m.id = f.meme_id ${whereClause}`;
+    const countSql = `SELECT COUNT(*) as filtered_count FROM memes m LEFT JOIN meme_curation_final f ON m.id = f.meme_id LEFT JOIN ingestion_jobs j ON m.id = j.meme_id ${whereClause}`;
     const countStmt = params.length > 0 ? env.DB.prepare(countSql).bind(...params) : env.DB.prepare(countSql);
     const countRes = await countStmt.first<{ filtered_count: number }>();
     totalCount = Number(countRes?.filtered_count) || 0;
@@ -197,9 +204,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   // 3. Fetch query page (or all if unbounded legacy)
   let querySql = `
-    SELECT m.*, f.corpus_status as final_status
+    SELECT m.*, f.corpus_status as final_status, j.batch_id, j.created_at as batch_uploaded_at, j.original_filename
     FROM memes m
     LEFT JOIN meme_curation_final f ON m.id = f.meme_id
+    LEFT JOIN ingestion_jobs j ON m.id = j.meme_id
     ${whereClause}
     ORDER BY ${sortCol} ${sortDir}
   `;
@@ -211,13 +219,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const stmt = queryParams.length > 0 ? env.DB.prepare(querySql).bind(...queryParams) : env.DB.prepare(querySql);
-  const { results } = await stmt.all<D1MemeRow & { final_status?: string | null }>();
+  const { results } = await stmt.all<D1MemeRow & { final_status?: string | null; batch_id?: string | null; batch_uploaded_at?: string | null; original_filename?: string | null }>();
 
   const memes = (results || []).map((row) => ({
     ...normalizeRow(env, row),
     final_status: row.final_status || null,
     curation_status: row.curation_status || row.final_status || null,
-    is_finalized_keep: row.final_status === "keep"
+    is_finalized_keep: row.final_status === "keep",
+    batch_id: row.batch_id || null,
+    batch_uploaded_at: row.batch_uploaded_at || null,
+    original_filename: row.original_filename || null
   }));
 
   const totalPages = perPage > 0 ? Math.max(1, Math.ceil(totalCount / perPage)) : 1;

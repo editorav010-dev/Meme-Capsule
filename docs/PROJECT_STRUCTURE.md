@@ -1213,6 +1213,7 @@ meme application/
 │   ├── fetch-knowledge.sh
 │   ├── update-knowledge.ps1
 │   └── update-knowledge.sh
+├── .nexus
 ├── .vscode
 │   ├── launch.json
 │   └── settings.json
@@ -1552,6 +1553,7 @@ meme application/
 │   │   ├── 005_curation_final.sql
 │   │   ├── 006_judge_ai_presets.sql
 │   │   ├── 007_add_judge4_judge5.sql
+│   │   ├── 007b_create_ai_curation_predictions.sql
 │   │   ├── 008_optimize_curation_indexes.sql
 │   │   ├── 009_add_api_password_to_users.sql
 │   │   ├── 010_enforce_superadmin_active_and_cleanup_judges.sql
@@ -1623,6 +1625,7 @@ meme application/
 │   │   ├── fallbackMemes.ts                          # Static fallback memes for offline/empty DB
 │   │   ├── fcmAuth.ts
 │   │   ├── forceRemove.ts
+│   │   ├── googleDriveAuth.ts
 │   │   ├── ingestion.ts
 │   │   ├── liveAnalytics.ts
 │   │   └── pages.ts                                  # Cloudflare Pages type definitions
@@ -1641,6 +1644,7 @@ meme application/
 │   │   │   │   └── trends.ts
 │   │   │   ├── ingestion                             # Durable bulk meme intake API routes
 │   │   │   │   ├── batches.ts                        # Create/read idempotent ingestion batches
+│   │   │   │   ├── drive-cron.ts
 │   │   │   │   ├── process.ts                        # Run bounded Judge 4/5 advisory processing
 │   │   │   │   ├── retry.ts
 │   │   │   │   └── upload.ts                         # POST /api/admin/upload
@@ -1707,6 +1711,9 @@ meme application/
 │   │   │   ├── me.ts
 │   │   │   └── next.ts
 │   │   ├── curate
+│   │   │   ├── media
+│   │   │   │   ├── edit.ts
+│   │   │   │   └── proxy.ts
 │   │   │   ├── super
 │   │   │   │   ├── bulk-resolve.ts
 │   │   │   │   ├── export.ts
@@ -1729,6 +1736,7 @@ meme application/
 │   │   ├── notifications
 │   │   │   ├── _fcm.ts
 │   │   │   └── register.ts
+│   │   ├── catalog.ts
 │   │   ├── contact.ts
 │   │   ├── daily-meme.ts                             # GET /api/daily-meme — public
 │   │   ├── events.ts
@@ -1751,8 +1759,13 @@ meme application/
 │   │   ├── admin.css                                 # Admin-specific styles
 │   │   ├── AdminApp.tsx                              # Admin UI component
 │   │   ├── AdminGate.tsx
+│   │   ├── BatchDeleteModal.tsx
+│   │   ├── BatchHistoryDrawer.tsx
+│   │   ├── BatchInfoModal.tsx
 │   │   ├── bulkIngestion.ts                          # Bulk intake validation and content hashing
 │   │   ├── BulkIngestionWorkspace.tsx                     # Admin durable bulk image intake UI
+│   │   ├── DuplicateConflictModal.tsx
+│   │   ├── intakeStorage.ts
 │   │   ├── PushNotifications.tsx
 │   │   └── ScheduledNotifications.tsx
 │   ├── ai-judge
@@ -1792,6 +1805,12 @@ meme application/
 │   │   │   └── useAiJudgeLoop.ts
 │   │   ├── analytics-preview
 │   │   │   └── AnalyticsPreviewPage.tsx
+│   │   ├── editor
+│   │   │   ├── exportCanvas.ts
+│   │   │   ├── ImageEditorModal.tsx
+│   │   │   ├── imageEditorTypes.ts
+│   │   │   ├── KonvaCanvas.tsx
+│   │   │   └── pixelEffects.ts
 │   │   ├── super
 │   │   │   ├── curateSuperApi.ts
 │   │   │   ├── CurateSuperDashboard.tsx
@@ -1818,13 +1837,17 @@ meme application/
 │   │   ├── localState.ts                             # Local device state (favorites, LOLs)
 │   │   └── memeApi.ts                                # Frontend → public meme API client
 │   ├── base.css
+│   ├── landing.css
+│   ├── LandingPage.tsx
 │   ├── main.tsx                                      # React entry point and router
 │   ├── types.ts                                      # TypeScript type definitions (Meme, Rarity, etc.)
 │   └── vite-env.d.ts                                 # Vite environment type augmentation
 ├── tests
 │   ├── analytics.test.ts
 │   ├── bulkIngestion.test.ts
-│   └── curationConsensus.test.mjs
+│   ├── curationConsensus.test.mjs
+│   ├── editor.test.ts
+│   └── vault.test.ts
 ├── workers
 │   ├── analyticsAggregator.ts
 │   ├── notificationScheduler.ts

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  checkIngestionDuplicates,
   createIngestionBatch,
   deleteIngestionBatch,
   getIngestionBatch,
@@ -17,8 +18,17 @@ import {
   createBulkDraftItem,
   formatBytes,
   totalDraftBytes,
-  type BulkDraftItem
+  type BulkDraftItem,
+  type ConflictResolution
 } from "./bulkIngestion";
+import {
+  saveIntakeBlobs,
+  getIntakeBlob,
+  removeIntakeBlob,
+  clearAllIntakeBlobs
+} from "./intakeStorage";
+import DuplicateConflictModal from "./DuplicateConflictModal";
+import BatchHistoryDrawer from "./BatchHistoryDrawer";
 
 const SESSION_KEY = "meme-capsule:admin-ingestion-session";
 const UPLOAD_CONCURRENCY = 6;
@@ -42,6 +52,8 @@ type BulkIngestionWorkspaceProps = {
   onNotice: (message: string) => void;
   onBackendChanged: () => Promise<void> | void;
   onOpenVault?: () => void;
+  onInspectBatch?: (batchId: string) => void;
+  onMemeIngested?: (meme: { id: string; title: string }) => void;
 };
 
 type PersistedItem = Pick<BulkDraftItem, "clientItemId" | "memeId" | "fileName" | "title" | "mimeType" | "byteSize" | "contentHash">;
@@ -103,7 +115,9 @@ export default function BulkIngestionWorkspace({
   backendMode,
   onNotice,
   onBackendChanged,
-  onOpenVault
+  onOpenVault,
+  onInspectBatch,
+  onMemeIngested
 }: BulkIngestionWorkspaceProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<BulkDraftItem[]>([]);
@@ -112,6 +126,9 @@ export default function BulkIngestionWorkspace({
   const [isDragging, setIsDragging] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [isBatchHistoryOpen, setIsBatchHistoryOpen] = useState(false);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   const [brokenPreviews, setBrokenPreviews] = useState<Set<string>>(new Set());
   const [uploadTelemetry, setUploadTelemetry] = useState<{
     bytesUploaded: number;
@@ -140,6 +157,11 @@ export default function BulkIngestionWorkspace({
   const submitted = Boolean(batchId);
   const totalBytes = useMemo(() => totalDraftBytes(items), [items]);
   const invalidCount = useMemo(() => items.filter((item) => item.validationErrors.length > 0).length, [items]);
+
+  const conflictedItems = useMemo(
+    () => items.filter((item) => (item.duplicateConflict || item.duplicateWarning) && !item.resolution),
+    [items]
+  );
 
   // Decoupled upload counts - strictly file and media ingestion
   const uploadedCount = useMemo(
@@ -192,15 +214,24 @@ export default function BulkIngestionWorkspace({
     setIsRestoring(true);
     setBatchId(persisted.batchId);
     getIngestionBatch(adminToken, persisted.batchId)
-      .then((serverStatus) => {
-        const hydrated = persisted.items.map((item) => ({
-          ...item,
-          file: null,
-          previewUrl: "",
-          validationErrors: [],
-          duplicateWarning: null
-        }));
-        setItems(mergeServerStatus(hydrated, serverStatus));
+      .then(async (serverStatus) => {
+        const hydrated = await Promise.all(
+          persisted.items.map(async (item) => {
+            const cachedBlob = await getIntakeBlob(item.clientItemId);
+            const file = cachedBlob instanceof Blob
+              ? new File([cachedBlob], item.fileName, { type: item.mimeType })
+              : null;
+            return {
+              ...item,
+              file,
+              previewUrl: file ? URL.createObjectURL(file) : "",
+              validationErrors: [],
+              duplicateWarning: null
+            };
+          })
+        );
+        const merged = mergeServerStatus(hydrated, serverStatus);
+        setItems(merged);
         applyStatus(serverStatus);
         const upCount = serverStatus.items.filter((it) => it.upload_state === "uploaded").length;
         if (upCount === serverStatus.items.length && upCount > 0) {
@@ -213,7 +244,12 @@ export default function BulkIngestionWorkspace({
             isComplete: true
           });
         }
-        onNotice(`Restored intake session for batch ${persisted.batchId}.`);
+        const hasResumableFiles = merged.some((it) => it.file && it.server && it.server.upload_state !== "uploaded");
+        onNotice(
+          hasResumableFiles
+            ? `Restored intake session for batch ${persisted.batchId} with local binary cache. Ready to resume.`
+            : `Restored intake session for batch ${persisted.batchId}.`
+        );
       })
       .catch(() => onNotice("Saved intake progress could not be loaded."))
       .finally(() => setIsRestoring(false));
@@ -249,6 +285,16 @@ export default function BulkIngestionWorkspace({
       nextItems = [...items];
       const targetFiles = selected.slice(0, pending.length);
       const drafts = await Promise.all(targetFiles.map((file) => createBulkDraftItem(file)));
+      await saveIntakeBlobs(drafts.filter((d) => d.file !== null).map((d) => ({
+        clientItemId: d.clientItemId,
+        blob: d.file!,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        contentHash: d.contentHash,
+        byteSize: d.byteSize,
+        timestamp: Date.now()
+      }))).catch(() => undefined);
+
       for (const [index, draft] of drafts.entries()) {
         const target = pending[index];
         if (draft.previewUrl && target.previewUrl) URL.revokeObjectURL(target.previewUrl);
@@ -268,6 +314,16 @@ export default function BulkIngestionWorkspace({
       }
       const acceptedFiles = selected.slice(0, remainingSlots);
       const drafts = await Promise.all(acceptedFiles.map((file) => createBulkDraftItem(file)));
+      await saveIntakeBlobs(drafts.filter((d) => d.file !== null).map((d) => ({
+        clientItemId: d.clientItemId,
+        blob: d.file!,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        contentHash: d.contentHash,
+        byteSize: d.byteSize,
+        timestamp: Date.now()
+      }))).catch(() => undefined);
+
       nextItems = [...items];
       for (const draft of drafts) {
         const collision = nextItems.find((candidate) => candidate.clientItemId === draft.clientItemId);
@@ -278,7 +334,70 @@ export default function BulkIngestionWorkspace({
         nextItems.push(draft);
       }
     }
-    const withWarnings = applyDuplicateWarnings(nextItems);
+
+    let withWarnings = applyDuplicateWarnings(nextItems);
+
+    // Multi-tier duplicate check against live Cloudflare D1
+    if (backendMode && adminToken.trim()) {
+      setIsCheckingDuplicates(true);
+      try {
+        const hashes = Array.from(new Set(withWarnings.map((item) => item.contentHash)));
+        const { conflicts } = await checkIngestionDuplicates(adminToken, hashes);
+        if (conflicts && conflicts.length > 0) {
+          const conflictMap = new Map(conflicts.map((c) => [c.content_hash, c]));
+          withWarnings = withWarnings.map((item) => {
+            const conflict = conflictMap.get(item.contentHash);
+            if (conflict) {
+              return {
+                ...item,
+                duplicateConflict: {
+                  existingJobId: conflict.existing_job_id,
+                  existingMemeId: conflict.existing_meme_id,
+                  existingTitle: conflict.existing_title,
+                  existingFilename: conflict.existing_filename,
+                  existingSize: conflict.existing_size,
+                  existingMimeType: conflict.existing_mime_type,
+                  existingStatus: conflict.existing_status,
+                  existingUrl: conflict.existing_url,
+                  matchReason: conflict.match_reason
+                },
+                duplicateWarning: `Duplicate of existing meme: ${conflict.existing_title || conflict.existing_meme_id}`
+              };
+            }
+            return item;
+          });
+        }
+      } catch {
+        // Non-blocking fallback
+      } finally {
+        setIsCheckingDuplicates(false);
+      }
+    }
+
+    // Populate in-batch conflict previews
+    const seenHashes = new Map<string, BulkDraftItem>();
+    withWarnings = withWarnings.map((item) => {
+      const first = seenHashes.get(item.contentHash);
+      if (!first) {
+        seenHashes.set(item.contentHash, item);
+        return item;
+      }
+      return {
+        ...item,
+        duplicateConflict: item.duplicateConflict || {
+          existingJobId: first.clientItemId,
+          existingMemeId: first.memeId,
+          existingTitle: first.title,
+          existingFilename: first.fileName,
+          existingSize: first.byteSize,
+          existingMimeType: first.mimeType,
+          existingStatus: "draft (same batch)",
+          existingUrl: first.previewUrl,
+          matchReason: "Duplicate file within this same upload batch"
+        }
+      };
+    });
+
     setItems(withWarnings);
     if (withWarnings.some((item) => item.validationErrors.length > 0)) {
       onNotice("Some files need attention before the batch can be confirmed. Video files are rejected in bulk intake.");
@@ -349,8 +468,17 @@ export default function BulkIngestionWorkspace({
       completedUploadBytesRef.current += local.file.size;
       activeUploadBytesRef.current.delete(statusItem.job_id);
       applyStatus(currentStatus);
+      // Clean completed binary from local IndexedDB
+      await removeIntakeBlob(statusItem.idempotency_key).catch(() => undefined);
+      // Reactively notify parent to increment top-level collection counters immediately
+      if (onMemeIngested) {
+        onMemeIngested({
+          id: statusItem.meme_id,
+          title: statusItem.title || statusItem.original_filename
+        });
+      }
     }
-  }, [adminToken, applyStatus, onNotice]);
+  }, [adminToken, applyStatus, onNotice, onMemeIngested]);
 
   const uploadBatchFiles = async (status: IngestionBatchStatus) => {
     const pendingUploads = status.items.filter((item) => item.upload_state !== "uploaded");
@@ -406,6 +534,45 @@ export default function BulkIngestionWorkspace({
     return status;
   };
 
+  const handleConflictResolve = (
+    clientItemId: string,
+    resolution: ConflictResolution,
+    applyToRemaining: boolean
+  ) => {
+    setItems((current) => {
+      let targetSeen = false;
+      return current.map((item) => {
+        if (item.clientItemId === clientItemId) {
+          targetSeen = true;
+          return {
+            ...item,
+            resolution,
+            replaceMemeId: resolution === "replace_existing" ? item.duplicateConflict?.existingMemeId : undefined
+          };
+        }
+        if (applyToRemaining && targetSeen && (item.duplicateConflict || item.duplicateWarning) && !item.resolution) {
+          return {
+            ...item,
+            resolution,
+            replaceMemeId: resolution === "replace_existing" ? item.duplicateConflict?.existingMemeId : undefined
+          };
+        }
+        return item;
+      });
+    });
+  };
+
+  const handleCancelBatch = async () => {
+    items.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+    setItems([]);
+    setShowConflictModal(false);
+    await clearAllIntakeBlobs().catch(() => undefined);
+    saveSession(null, []);
+    onNotice("Batch intake cancelled and staged files cleared.");
+  };
+
   const confirmBatch = async () => {
     if (!backendMode || !adminToken.trim()) {
       onNotice("Connect the Admin backend with an API token before confirming a batch.");
@@ -419,14 +586,28 @@ export default function BulkIngestionWorkspace({
       onNotice(`The batch exceeds the ${Math.round(BULK_MAX_BATCH_BYTES / (1024 * 1024))} MiB total limit.`);
       return;
     }
-    if (items.some((item) => item.duplicateWarning) && !window.confirm("Duplicate content warnings are present. Upload these items anyway?")) return;
+
+    // Strict duplicate conflict gate: Must resolve all conflicts before batch creation
+    const unresolvedConflicts = items.filter(
+      (item) => (item.duplicateConflict || item.duplicateWarning) && !item.resolution
+    );
+    if (unresolvedConflicts.length > 0) {
+      setShowConflictModal(true);
+      return;
+    }
+
+    const activeItems = items.filter((item) => item.resolution !== "keep_existing");
+    if (activeItems.length === 0) {
+      onNotice("All items in this batch were duplicates and skipped. No new files to upload.");
+      return;
+    }
 
     setIsWorking(true);
     try {
       const idempotencyKey = `batch-${crypto.randomUUID()}`;
       const status = await createIngestionBatch(adminToken, {
         idempotency_key: idempotencyKey,
-        items: items.map((item) => ({
+        items: activeItems.map((item) => ({
           idempotency_key: item.clientItemId,
           meme_id: item.memeId,
           original_filename: item.fileName,
@@ -434,12 +615,13 @@ export default function BulkIngestionWorkspace({
           content_hash: item.contentHash,
           byte_size: item.byteSize,
           mime_type: item.mimeType,
-          media_type: "image"
+          media_type: "image",
+          replace_meme_id: item.resolution === "replace_existing" ? item.replaceMemeId || item.duplicateConflict?.existingMemeId : undefined
         }))
       });
       setBatchId(status.batch.id);
       applyStatus(status);
-      onNotice(`Batch ${status.batch.id} created. Uploading ${items.length} files to Cloudflare R2...`);
+      onNotice(`Batch ${status.batch.id} created. Uploading ${activeItems.length} files to Cloudflare R2...`);
       await uploadBatchFiles(status);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Unable to create the ingestion batch.");
@@ -489,6 +671,7 @@ export default function BulkIngestionWorkspace({
       items.forEach((item) => {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
       });
+      await clearAllIntakeBlobs().catch(() => undefined);
       setItems([]);
       setBatchId(null);
       setBatchStatus(null);
@@ -519,6 +702,7 @@ export default function BulkIngestionWorkspace({
     setIsWorking(true);
     try {
       const res = await deleteIngestionBatch(adminToken, "all_stale");
+      await clearAllIntakeBlobs().catch(() => undefined);
       onNotice(`✓ Cleared ${res.purged_jobs_count || 0} orphaned/stale intake jobs across D1.`);
       await onBackendChanged();
     } catch (error) {
@@ -528,10 +712,11 @@ export default function BulkIngestionWorkspace({
     }
   };
 
-  const startNewBatch = () => {
+  const startNewBatch = async () => {
     items.forEach((item) => {
       if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
     });
+    await clearAllIntakeBlobs().catch(() => undefined);
     setItems([]);
     setBatchId(null);
     setBatchStatus(null);
@@ -549,7 +734,8 @@ export default function BulkIngestionWorkspace({
   };
 
   return (
-    <section className="bulk-ingestion-panel brutalist-border brutalist-shadow-black-lg" aria-labelledby="bulk-ingestion-heading">
+    <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", width: "100%" }}>
+      <section className="bulk-ingestion-panel brutalist-border brutalist-shadow-black-lg" style={{ flex: 1, minWidth: 0 }} aria-labelledby="bulk-ingestion-heading">
       <div className="bulk-ingestion-heading">
         <div>
           <p className="bulk-kicker">INGESTION & UPLOAD PIPELINE</p>
@@ -559,6 +745,26 @@ export default function BulkIngestionWorkspace({
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="brutalist-border-sm bulk-secondary-button"
+            style={{
+              fontSize: "11px",
+              padding: "4px 10px",
+              background: isBatchHistoryOpen ? "var(--primary)" : "var(--surface)",
+              color: isBatchHistoryOpen ? "var(--on-primary)" : "var(--on-surface)",
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+            onClick={() => setIsBatchHistoryOpen(!isBatchHistoryOpen)}
+            title="View persistent batch history, R2 storage footprints, and inspect batches in Meme Vault"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>history</span>
+            {isBatchHistoryOpen ? "Close Ledger" : "Batch Ledger"}
+          </button>
+
           {submitted ? (
             <button
               type="button"
@@ -648,8 +854,45 @@ export default function BulkIngestionWorkspace({
         <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/heic,image/heif,.heic,.heif,.bmp" multiple hidden onChange={(event) => { void addFiles(event.target.files || []); event.target.value = ""; }} />
       </div>
 
-      {isRestoring && <p className="bulk-progress-note">Restoring saved server progress…</p>}
+      {isRestoring && <p className="bulk-progress-note">Restoring saved server progress and binary cache from IndexedDB…</p>}
+      {isCheckingDuplicates && <p className="bulk-progress-note" style={{ color: "#ffe600" }}>Checking duplicate hashes against live D1 collection…</p>}
       {invalidCount > 0 && <p className="bulk-error-summary" role="alert">{invalidCount} file{invalidCount === 1 ? "" : "s"} need attention before confirmation.</p>}
+      {conflictedItems.length > 0 && !submitted && (
+        <div
+          className="brutalist-border-sm"
+          style={{
+            padding: "10px 14px",
+            background: "#ff336622",
+            border: "2px solid #ff3366",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            color: "#ff6688"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="material-symbols-outlined">warning</span>
+            <strong style={{ fontSize: "12px" }}>
+              {conflictedItems.length} duplicate file conflict{conflictedItems.length === 1 ? "" : "s"} detected.
+            </strong>
+          </div>
+          <button
+            type="button"
+            className="brutalist-border-sm"
+            style={{
+              padding: "4px 10px",
+              background: "#ff3366",
+              color: "#fff",
+              fontWeight: 800,
+              cursor: "pointer",
+              fontSize: "11px"
+            }}
+            onClick={() => setShowConflictModal(true)}
+          >
+            Review & Resolve Conflicts
+          </button>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="bulk-review-table" role="region" aria-label="Bulk image review" tabIndex={0}>
@@ -703,6 +946,16 @@ export default function BulkIngestionWorkspace({
                       ARCHIVED (HUMAN READY)
                     </span>
                   )}
+                  {item.resolution === "keep_existing" && (
+                    <span className="badge brutalist-border-sm" style={{ background: "#222", color: "#00bb77", borderColor: "#00bb77", fontSize: "10px" }}>
+                      SKIPPED (KEEPING EXISTING)
+                    </span>
+                  )}
+                  {item.resolution === "replace_existing" && (
+                    <span className="badge brutalist-border-sm" style={{ background: "#ffe60022", color: "#ffe600", borderColor: "#ffe600", fontSize: "10px" }}>
+                      REPLACING ({item.replaceMemeId || item.duplicateConflict?.existingMemeId})
+                    </span>
+                  )}
                 </div>
                 {item.duplicateWarning && <em className="bulk-warning">⚠ {item.duplicateWarning}</em>}
                 {item.server?.upload_state === "failed" && item.server?.error_message && (
@@ -710,11 +963,23 @@ export default function BulkIngestionWorkspace({
                 )}
               </div>
               <div className="bulk-item-actions">
-                {!submitted && (
-                  <button type="button" className="brutalist-border-sm bulk-remove-button" onClick={() => removeItem(item.clientItemId)}>
-                    Remove
-                  </button>
-                )}
+                {!submitted ? (
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    {(item.duplicateConflict || item.duplicateWarning) && !item.resolution && (
+                      <button
+                        type="button"
+                        className="brutalist-border-sm"
+                        style={{ padding: "4px 8px", background: "#ff3366", color: "#fff", fontSize: "10px", fontWeight: 800, cursor: "pointer" }}
+                        onClick={() => setShowConflictModal(true)}
+                      >
+                        Resolve
+                      </button>
+                    )}
+                    <button type="button" className="brutalist-border-sm bulk-remove-button" onClick={() => removeItem(item.clientItemId)}>
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </article>
           ))}
@@ -723,14 +988,36 @@ export default function BulkIngestionWorkspace({
 
       <div className="bulk-actions">
         {!submitted ? (
-          <button
-            type="button"
-            className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive"
-            disabled={isWorking || !canConfirmBulk(items) || totalBytes > BULK_MAX_BATCH_BYTES || !backendMode}
-            onClick={() => void confirmBatch()}
-          >
-            {isWorking ? "Uploading…" : `Confirm & Upload Batch (${items.length} Files)`}
-          </button>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn-primary brutalist-border brutalist-shadow-black brutalist-interactive"
+              disabled={isWorking || !canConfirmBulk(items) || totalBytes > BULK_MAX_BATCH_BYTES || !backendMode || conflictedItems.length > 0}
+              onClick={() => void confirmBatch()}
+            >
+              {isWorking ? "Uploading…" : `Confirm & Upload Batch (${items.filter((i) => i.resolution !== "keep_existing").length} Files)`}
+            </button>
+            {conflictedItems.length > 0 && (
+              <button
+                type="button"
+                className="brutalist-border-sm brutalist-shadow-black"
+                style={{
+                  padding: "10px 16px",
+                  background: "#ff3366",
+                  color: "#fff",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+                onClick={() => setShowConflictModal(true)}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>warning</span>
+                Review Conflicts ({conflictedItems.length})
+              </button>
+            )}
+          </div>
         ) : (
           <>
             <button
@@ -789,5 +1076,27 @@ export default function BulkIngestionWorkspace({
       )}
       <p className="bulk-footnote">Images only · max {formatBytes(BULK_MAX_FILE_BYTES)} per file · no upload publishes content or creates a human vote.</p>
     </section>
+
+    {/* Batch History Drawer */}
+    <BatchHistoryDrawer
+      adminToken={adminToken}
+      isOpen={isBatchHistoryOpen}
+      onToggle={() => setIsBatchHistoryOpen(!isBatchHistoryOpen)}
+      onInspectBatch={onInspectBatch}
+      onBatchDeleted={async () => {
+        await onBackendChanged();
+      }}
+    />
+
+    {/* Duplicate Conflict Resolver Modal */}
+    {showConflictModal && conflictedItems.length > 0 && (
+      <DuplicateConflictModal
+        conflictedItems={conflictedItems}
+        onResolve={handleConflictResolve}
+        onCancelBatch={() => void handleCancelBatch()}
+        onClose={() => setShowConflictModal(false)}
+      />
+    )}
+  </div>
   );
 }

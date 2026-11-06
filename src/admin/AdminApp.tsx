@@ -201,6 +201,19 @@ export default function AdminApp() {
   const [totalFilteredCount, setTotalFilteredCount] = useState<number>(0);
   const [serverTotalPages, setServerTotalPages] = useState<number>(1);
   const [backendStats, setBackendStats] = useState<VaultStats | null>(null);
+  const [vaultBatchId, setVaultBatchId] = useState<string | null>(null);
+
+  // Reactively increment top-level collection counters when an upload succeeds
+  const handleReactiveMemeIngested = useCallback((_meme: { id: string; title: string }) => {
+    setBackendStats((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        drafts: prev.drafts + 1,
+        total: prev.total + 1
+      };
+    });
+  }, []);
 
   // Filtering & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -548,6 +561,7 @@ export default function AdminApp() {
       const nsfwParam = statusFilter === "nsfw" ? "nsfw" : undefined;
 
       const data = await fetchVaultMemes(adminToken, {
+        batch_id: vaultBatchId || undefined,
         page: targetPage,
         per_page: targetPerPage,
         q: debouncedSearch.trim() || undefined,
@@ -577,7 +591,7 @@ export default function AdminApp() {
       setIsSyncing(false);
       setSyncActionName("");
     }
-  }, [adminToken, currentPage, pageSize, statusFilter, debouncedSearch]);
+  }, [adminToken, currentPage, pageSize, statusFilter, debouncedSearch, vaultBatchId]);
 
   const handleAutoRefresh = useCallback(async () => {
     if (!adminToken.trim()) return;
@@ -592,7 +606,7 @@ export default function AdminApp() {
     if (backendMode && adminToken.trim()) {
       loadBackend(currentPage, pageSize);
     }
-  }, [currentPage, pageSize, statusFilter, debouncedSearch]);
+  }, [currentPage, pageSize, statusFilter, debouncedSearch, vaultBatchId]);
 
   // Intercept Ctrl+R / Cmd+R to refresh admin data without browser page reload, but allow Ctrl+Shift+R for hard browser reload
   useEffect(() => {
@@ -1062,6 +1076,25 @@ export default function AdminApp() {
             </div>
           )}
 
+          {/* Add Memes Workspace is kept permanently mounted in the DOM so active uploads and XHR workers never terminate on tab switch */}
+          <div
+            className="single-pane add-meme-layout"
+            style={{ display: activeTab === "add" ? "block" : "none" }}
+          >
+            <BulkIngestionWorkspace
+              adminToken={adminToken}
+              backendMode={backendMode}
+              onNotice={setNotice}
+              onBackendChanged={loadBackend}
+              onOpenVault={() => selectAdminView("vault")}
+              onInspectBatch={(batchId) => {
+                setVaultBatchId(batchId);
+                selectAdminView("vault");
+              }}
+              onMemeIngested={handleReactiveMemeIngested}
+            />
+          </div>
+
           {activeTab === "sql" ? (
             <div
               style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}
@@ -1074,17 +1107,7 @@ export default function AdminApp() {
               <PushNotifications adminToken={adminToken} />
               <ScheduledNotifications adminToken={adminToken} />
             </div>
-          ) : activeTab === "add" ? (
-            <div className="single-pane add-meme-layout">
-              <BulkIngestionWorkspace
-                adminToken={adminToken}
-                backendMode={backendMode}
-                onNotice={setNotice}
-                onBackendChanged={loadBackend}
-                onOpenVault={() => selectAdminView("vault")}
-              />
-            </div>
-          ) : (
+          ) : activeTab === "vault" ? (
             <div className={`split-pane ${editingOriginalId ? "" : "vault-single-pane"}`}>
               {/* LEFT PANE - VAULT */}
               <section className="left-pane">
@@ -1141,6 +1164,44 @@ export default function AdminApp() {
                       ))}
                     </div>
                   </div>
+
+                  {vaultBatchId && (
+                    <div
+                      className="brutalist-border-sm"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "#ffe60022",
+                        border: "1px solid #ffe600",
+                        color: "#ffe600",
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                        alignSelf: "flex-start"
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>filter_alt</span>
+                      <span>Filtered by Batch: {vaultBatchId}</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#ffe600",
+                          cursor: "pointer",
+                          fontWeight: 900,
+                          padding: "0 4px",
+                          fontSize: "14px"
+                        }}
+                        onClick={() => setVaultBatchId(null)}
+                        title="Clear batch filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
                   {/* Search filter input & Per-Page Selector */}
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1441,6 +1502,35 @@ export default function AdminApp() {
                             <label>Rarity</label>
                             <span>{inspectedMeme.rarity || "Common"}</span>
                           </div>
+
+                          {Boolean((inspectedMeme as any).batch_id || (inspectedMeme as any).original_filename) && (
+                            <div
+                              className="vault-inspector-field"
+                              style={{
+                                gridColumn: "1 / -1",
+                                background: "#ffe60012",
+                                border: "1px solid #ffe60055",
+                                padding: "8px",
+                                marginTop: "6px"
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#ffe600", fontWeight: 800, fontSize: "11px" }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>inventory_2</span>
+                                BATCH PROVENANCE
+                              </div>
+                              <div style={{ fontSize: "10px", fontFamily: "monospace", display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
+                                {(inspectedMeme as any).batch_id && (
+                                  <div><strong>Batch ID:</strong> {(inspectedMeme as any).batch_id}</div>
+                                )}
+                                {(inspectedMeme as any).original_filename && (
+                                  <div><strong>Original File:</strong> {(inspectedMeme as any).original_filename}</div>
+                                )}
+                                {(inspectedMeme as any).batch_uploaded_at && (
+                                  <div><strong>Uploaded:</strong> {new Date((inspectedMeme as any).batch_uploaded_at).toLocaleString()}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* INSTANT IN-PANEL CURATION DASHBOARD */}
@@ -1827,7 +1917,7 @@ export default function AdminApp() {
                 </section>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

@@ -284,6 +284,51 @@ export const retryIngestionItems = async (adminToken: string, jobIds: string[]) 
   return parseJsonResponse<{ success: boolean; reset_jobs: number; batches: IngestionBatchStatus[] }>(response);
 };
 
+export type DuplicateConflictInfo = {
+  content_hash: string;
+  existing_job_id: string;
+  existing_meme_id: string;
+  existing_title: string;
+  existing_filename: string;
+  existing_size: number;
+  existing_mime_type: string;
+  existing_status: string;
+  existing_url: string;
+  match_reason: string;
+};
+
+export type IngestionBatchSummary = {
+  id: string;
+  idempotency_key: string;
+  actor_name: string;
+  status: "queued" | "processing" | "partial" | "complete" | "failed" | "cancelled";
+  total_items: number;
+  uploaded_items: number;
+  upload_failed_items: number;
+  total_bytes: number;
+  uploaded_bytes: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export const checkIngestionDuplicates = async (adminToken: string, hashes: string[]) => {
+  const response = await fetch("/api/admin/ingestion/batches", {
+    method: "POST",
+    headers: ingestionHeaders(adminToken, "application/json"),
+    body: JSON.stringify({ action: "check_duplicates", hashes }),
+    cache: "no-store"
+  });
+  return parseJsonResponse<{ conflicts: DuplicateConflictInfo[] }>(response);
+};
+
+export const listIngestionBatches = async (adminToken: string, limit = 20, offset = 0) => {
+  const response = await fetch(`/api/admin/ingestion/batches?limit=${limit}&offset=${offset}`, {
+    headers: ingestionHeaders(adminToken),
+    cache: "no-store"
+  });
+  return parseJsonResponse<{ batches: IngestionBatchSummary[] }>(response);
+};
+
 export const deleteIngestionBatch = async (adminToken: string, batchId: string) => {
   const response = await fetch(`/api/admin/ingestion/batches?id=${encodeURIComponent(batchId)}`, {
     method: "DELETE",
@@ -301,6 +346,7 @@ export type VaultViewMode =
   | "detailed-list";
 
 export type VaultQuery = {
+  batch_id?: string;
   page?: number;
   per_page?: number;
   q?: string;
@@ -339,6 +385,7 @@ export type VaultResponse = {
 export const fetchVaultMemes = async (adminToken: string, query?: VaultQuery): Promise<VaultResponse> => {
   const params = new URLSearchParams();
   if (query) {
+    if (query.batch_id) params.set("batch_id", query.batch_id);
     if (query.page) params.set("page", String(query.page));
     if (query.per_page) params.set("per_page", String(query.per_page));
     if (query.q) params.set("q", query.q);

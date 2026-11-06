@@ -72,6 +72,20 @@ export const sniffImageMime = (bytes: Uint8Array): string | null => {
   return null;
 };
 
+export type ConflictResolution = "keep_existing" | "replace_existing" | "cancel";
+
+export type DuplicateConflictDetail = {
+  existingJobId?: string;
+  existingMemeId?: string;
+  existingTitle?: string;
+  existingFilename?: string;
+  existingSize?: number;
+  existingMimeType?: string;
+  existingStatus?: string;
+  existingUrl?: string;
+  matchReason?: string;
+};
+
 export type BulkDraftItem = {
   clientItemId: string;
   memeId: string;
@@ -84,6 +98,9 @@ export type BulkDraftItem = {
   previewUrl: string;
   validationErrors: string[];
   duplicateWarning: string | null;
+  duplicateConflict?: DuplicateConflictDetail | null;
+  resolution?: ConflictResolution;
+  replaceMemeId?: string;
   server?: IngestionItemStatus;
 };
 
@@ -171,4 +188,9 @@ export const canConfirmBulk = (items: BulkDraftItem[]) =>
   items.length > 0 &&
   items.length <= BULK_MAX_ITEMS &&
   totalDraftBytes(items) <= BULK_MAX_BATCH_BYTES &&
-  items.every((item) => item.validationErrors.length === 0 && item.file !== null);
+  items.every(
+    (item) =>
+      item.validationErrors.length === 0 &&
+      item.file !== null &&
+      (!item.duplicateConflict || item.resolution === "keep_existing" || item.resolution === "replace_existing")
+  );

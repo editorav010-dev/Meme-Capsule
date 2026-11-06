@@ -11,6 +11,7 @@ import {
   isValidId,
   normalizeTitle,
   refreshBatchStatus,
+  toPublicUrl,
   type IngestionBatchRow
 } from "../../../_shared/ingestion";
 
@@ -23,9 +24,12 @@ type BatchItemInput = {
   byte_size?: number;
   mime_type?: string;
   media_type?: string;
+  replace_meme_id?: string;
 };
 
 type BatchPayload = {
+  action?: string;
+  hashes?: string[];
   idempotency_key?: string;
   items?: BatchItemInput[];
 };
@@ -58,8 +62,48 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (adminError) return adminError;
   if (!(await hasIngestionSchema(env.DB))) return schemaUnavailable();
 
-  const batchId = (new URL(request.url).searchParams.get("id") || "").trim();
-  if (!batchId) return json({ error: "id is required." }, { status: 400 });
+  const url = new URL(request.url);
+  const batchId = (url.searchParams.get("id") || "").trim();
+
+  if (!batchId) {
+    const limit = Math.max(1, Math.min(50, parseInt(url.searchParams.get("limit") || "20", 10)));
+    const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10));
+
+    try {
+      const batchesRes = await env.DB.prepare(`
+        SELECT b.id, b.idempotency_key, b.actor_name, b.status,
+               b.total_items, b.total_bytes, b.ready_items, b.failed_items,
+               b.created_at, b.completed_at,
+               COUNT(j.job_id) as total_jobs,
+               SUM(CASE WHEN j.upload_state = 'uploaded' THEN 1 ELSE 0 END) as uploaded_items,
+               SUM(CASE WHEN j.upload_state = 'failed' THEN 1 ELSE 0 END) as upload_failed_items,
+               COALESCE(SUM(CASE WHEN j.upload_state = 'uploaded' THEN j.byte_size ELSE 0 END), 0) as uploaded_bytes
+        FROM ingestion_batches b
+        LEFT JOIN ingestion_jobs j ON b.id = j.batch_id
+        GROUP BY b.id
+        ORDER BY b.created_at DESC
+        LIMIT ? OFFSET ?
+      `).bind(limit, offset).all();
+
+      return json({
+        batches: (batchesRes.results || []).map((row: any) => ({
+          id: row.id,
+          idempotency_key: row.idempotency_key,
+          actor_name: row.actor_name || "Admin",
+          status: row.status,
+          total_items: Number(row.total_items) || Number(row.total_jobs) || 0,
+          uploaded_items: Number(row.uploaded_items) || 0,
+          upload_failed_items: Number(row.upload_failed_items) || 0,
+          total_bytes: Number(row.total_bytes) || 0,
+          uploaded_bytes: Number(row.uploaded_bytes) || 0,
+          created_at: row.created_at,
+          completed_at: row.completed_at
+        }))
+      });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : "Unable to list ingestion batches." }, { status: 503 });
+    }
+  }
 
   try {
     const status = await getBatchStatus(env, batchId);
@@ -77,6 +121,49 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const payload = await parsePayload(request);
+
+    // Duplicate Check Pre-flight Action
+    if (payload.action === "check_duplicates") {
+      const hashes = Array.isArray(payload.hashes)
+        ? payload.hashes.filter((h: unknown) => typeof h === "string" && isValidHash(String(h).trim().toLowerCase())).map((h) => String(h).trim().toLowerCase())
+        : [];
+
+      if (hashes.length === 0) {
+        return json({ conflicts: [] });
+      }
+
+      const conflicts: any[] = [];
+      for (const chunk of chunkArray(hashes, 40)) {
+        const placeholders = chunk.map(() => "?").join(",");
+        const res = await env.DB.prepare(`
+          SELECT j.job_id, j.meme_id, j.content_hash, j.original_filename, j.byte_size, j.mime_type, j.storage_path,
+                 m.id as meme_id, m.title as meme_title, m.status as meme_status, m.is_active, m.image_url, m.storage_path as meme_storage_path, m.likes_count
+          FROM ingestion_jobs j
+          LEFT JOIN memes m ON m.id = j.meme_id
+          WHERE j.content_hash IN (${placeholders})
+        `).bind(...chunk).all();
+
+        for (const row of res.results || []) {
+          const existingStoragePath = (row as any).meme_storage_path || (row as any).storage_path || null;
+          const existingUrl = (row as any).image_url || toPublicUrl(env, existingStoragePath);
+          conflicts.push({
+            content_hash: (row as any).content_hash,
+            existing_job_id: (row as any).job_id,
+            existing_meme_id: (row as any).meme_id,
+            existing_title: (row as any).meme_title || (row as any).original_filename || "Untitled Meme",
+            existing_filename: (row as any).original_filename,
+            existing_size: Number((row as any).byte_size) || 0,
+            existing_mime_type: (row as any).mime_type || "image/jpeg",
+            existing_status: (row as any).meme_status || ((row as any).is_active === 1 ? "active" : "draft"),
+            existing_url: existingUrl,
+            match_reason: "Exact SHA-256 Hash Match"
+          });
+        }
+      }
+
+      return json({ conflicts });
+    }
+
     const idempotencyKey = (payload.idempotency_key || "").trim();
     const items = Array.isArray(payload.items) ? payload.items : [];
 
@@ -105,6 +192,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       contentHash: string;
       byteSize: number;
       mimeType: string;
+      replaceMemeId?: string;
     }>;
     let totalBytes = 0;
 
@@ -115,6 +203,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       const contentHash = (item.content_hash || "").trim().toLowerCase();
       const byteSize = Number(item.byte_size);
       const mimeType = (item.mime_type || "").trim().toLowerCase();
+      const replaceMemeId = (item.replace_meme_id || "").trim() || undefined;
 
       if (!itemKeyPattern.test(itemIdempotencyKey)) {
         return json({ error: "Each item needs a stable idempotency_key." }, { status: 400 });
@@ -145,7 +234,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         title: normalizeTitle(String(item.title || ""), filename),
         contentHash,
         byteSize,
-        mimeType
+        mimeType,
+        replaceMemeId
       });
     }
 
@@ -180,6 +270,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       for (const row of res.results || []) existingHashJobs.set(row.content_hash, row.job_id);
     }
 
+    // STRICT CONFLICT GATE: If any item matches an existing content hash in D1 and is not marked as replace, block!
+    const unresolvedConflicts: string[] = [];
+    for (const item of normalizedItems) {
+      const existingJobId = existingHashJobs.get(item.contentHash);
+      if (existingJobId && !item.replaceMemeId) {
+        unresolvedConflicts.push(`${item.originalFilename} (matches job ${existingJobId})`);
+      }
+    }
+    if (unresolvedConflicts.length > 0) {
+      return json({
+        error: `Unresolved duplicate conflict detected for: ${unresolvedConflicts.slice(0, 3).join(", ")}${unresolvedConflicts.length > 3 ? ` and ${unresolvedConflicts.length - 3} more` : ""}. Please resolve duplicates using the Conflict Resolver before uploading.`,
+        conflicts: unresolvedConflicts
+      }, { status: 409 });
+    }
+
     const batchId = `batch-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const statements: D1PreparedStatement[] = [
@@ -193,7 +298,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     for (const item of normalizedItems) {
       const jobId = `job-${crypto.randomUUID()}`;
-      const duplicateOf = existingHashJobs.get(item.contentHash) || null;
+      const duplicateOf = item.replaceMemeId
+        ? `replace:${item.replaceMemeId}`
+        : (existingHashJobs.get(item.contentHash) || null);
+
       // Defensive resolution: If an idempotency key or meme ID already exists in D1 from an older batch,
       // scope it to this batch instead of throwing a blocking 409 conflict.
       const safeKey = existingKeysSet.has(item.idempotencyKey)
