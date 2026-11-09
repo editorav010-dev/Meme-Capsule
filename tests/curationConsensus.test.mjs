@@ -14,7 +14,6 @@ const vote = (user_id, corpus_status, overrides = {}) => ({
 
 const ai = {
   judge4: { topics: ["Gaming"], tone: "Chaotic", humour_mechanisms: ["Absurdity"] },
-  judge5: { topics: ["Gaming"], tone: "Chaotic", humour_mechanisms: ["Absurdity"] },
 };
 
 const judges = ["user-judge1", "user-judge2", "user-judge3"];
@@ -83,7 +82,7 @@ test("uses unanimous review_later directly without final-table status", () => {
   assert.equal(result.corpus_status, "review_later");
 });
 
-test("uses AI Judge 4/5 fallback when no human secondary-field option has majority", () => {
+test("uses AI Judge fallback when no human secondary-field option has majority", () => {
   const result = resolveHumanConsensus([
     vote(judges[0], "keep", { topics: ["Gaming"], tone: "Dark", humour_mechanisms: ["Irony"] }),
     vote(judges[1], "keep", { topics: ["Food"], tone: "Wholesome", humour_mechanisms: ["Parody"] }),

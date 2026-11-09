@@ -60,7 +60,6 @@ export interface CurateBatchItem {
   valid_drafts: number;
   failed_uploads: number;
   judge4: { completed: number; remaining: number };
-  judge5: { completed: number; remaining: number };
   both_completed: number;
   percent_complete: number;
 }
@@ -84,7 +83,7 @@ export async function saveAdvisoryEvaluation(payload: {
   confidence?: number;
   model?: string;
   latency_ms?: number;
-  judge_key?: "judge4" | "judge5";
+  judge_key?: "judge4";
 }): Promise<{ success: boolean; meme_id: string; judge_key: string; all_ai_completed: boolean }> {
   const res = await fetch("/api/curate/advisory-save", {
     method: "POST",
@@ -137,7 +136,7 @@ export async function approveCuration(payload: {
   curator_note?: string | null;
   user_id?: string;
   user_name?: string;
-  adopted_from?: "judge4" | "judge5" | "consensus" | "manual";
+  adopted_from?: "judge4" | "consensus" | "manual";
 }): Promise<{ success: boolean; meme_id: string; is_final: boolean }> {
   const res = await fetch("/api/curate/approve", {
     method: "POST",

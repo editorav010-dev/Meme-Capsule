@@ -276,13 +276,7 @@ export default function CurateApp() {
       setOverrideMode(true);
     } else {
       const j4 = meme.ai_judgements?.judge4;
-      const j5 = meme.ai_judgements?.judge5;
-      let prefill = j4 || j5 || null;
-      if (j4 && j5 && j4.corpus_status === j5.corpus_status && j4.corpus_status !== 'excluded') {
-        prefill = j4;
-      } else if (j4 && j5) {
-        prefill = j4;
-      }
+      const prefill = j4 || null;
       setStatus(prefill?.corpus_status || null);
       setTopics(prefill?.topics || []);
       setTone(prefill?.tone || null);
@@ -654,7 +648,7 @@ export default function CurateApp() {
 
   // Approve current decision and advance instantly with 0ms perceived latency
   const handleApproveAndAdvance = useCallback(async (
-    source: "manual" | "judge4" | "judge5" | "consensus" = "manual",
+    source: "manual" | "judge4" | "consensus" = "manual",
     forcedStatus?: CorpusStatus,
     forcedDecision?: AiJudgeDecision | import("./curateTypes").CuratedMemeData
   ): Promise<CurateMemeItem | null> => {
@@ -802,7 +796,7 @@ export default function CurateApp() {
   // Mobile Touch Gesture Actions: both left and right swiping gestures adopt AI Judge evaluation
   const handleAdoptAiSwipe = useCallback(async (direction: "left" | "right") => {
     const s = stateRef.current;
-    const aiJudge = s.currentMeme?.ai_judgements?.judge4 || s.currentMeme?.ai_judgements?.judge5;
+    const aiJudge = s.currentMeme?.ai_judgements?.judge4;
     if (!aiJudge?.corpus_status) return;
 
     setSwipeAnimation(direction);
@@ -1091,9 +1085,8 @@ export default function CurateApp() {
       // 0. REVIEW MODE KEYMAP (!overrideMode)
       if (!stateRef.current.overrideMode) {
         const j4 = stateRef.current.currentMeme?.ai_judgements?.judge4;
-        const j5 = stateRef.current.currentMeme?.ai_judgements?.judge5;
-        const aiEvaluation = j4?.corpus_status ? j4 : (j5?.corpus_status ? j5 : null);
-        const adoptSource: "judge4" | "judge5" = j4?.corpus_status ? "judge4" : "judge5";
+        const aiEvaluation = j4?.corpus_status ? j4 : null;
+        const adoptSource: "judge4" = "judge4";
         const hasAi = Boolean(aiEvaluation?.corpus_status);
 
         // Space OR Enter: Adopt AI Evaluation
@@ -1752,13 +1745,12 @@ export default function CurateApp() {
           {!overrideMode && currentMeme && (
             <AiReviewPanel
               j4={currentMeme.ai_judgements?.judge4}
-              j5={currentMeme.ai_judgements?.judge5}
               onEnterOverride={() => setOverrideMode(true)}
               onAdopt={(j, src) => handleApproveAndAdvance(src, j.corpus_status, j)}
               onForceRemove={handleForceRemove}
               isMobile={true}
               isAiJudge={isAiJudge}
-              judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
+              judgeName={user?.display_name || "AI Judge"}
               onTestEvaluate={handleTestEvaluateCurrentMeme}
               isTesting={isSingleEvaluating}
               activeModel={aiConfig.model}
@@ -2175,12 +2167,11 @@ export default function CurateApp() {
             {!overrideMode && currentMeme && (
               <AiReviewPanel
                 j4={currentMeme.ai_judgements?.judge4}
-                j5={currentMeme.ai_judgements?.judge5}
                 onEnterOverride={() => setOverrideMode(true)}
                 onAdopt={(j, src) => handleApproveAndAdvance(src, j.corpus_status, j)}
                 onForceRemove={handleForceRemove}
                 isAiJudge={isAiJudge}
-                judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
+                judgeName={user?.display_name || "AI Judge"}
                 onTestEvaluate={handleTestEvaluateCurrentMeme}
                 isTesting={isSingleEvaluating}
                 activeModel={aiConfig.model}

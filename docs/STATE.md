@@ -558,14 +558,14 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
 
 
 
-## 19. Transition to Single-AI-Judge Architecture & Judge 5 Retirement (November 10, 2026)
+## 19. Transition to Single-AI-Judge Architecture & Complete Removal of Judge 5 (November 10, 2026)
 
 - **1. Sole Active AI Authority (Judge 4 -> AI Judge)**:
-  - Retired `user-judge5` from the active curation workflow by setting `is_active = 0` (disables login, preserves all foreign keys and historical records).
+  - Completely purged and removed `user-judge5` and its associated rows across all tables (`cat_users`, `cat_judge_ai_presets`, `meme_curation`, `ingestion_ai_evaluations`, `meme_force_removals`, `cat_sessions`).
   - Renamed `user-judge4` to username `ai-judge` and display name `AI Judge` in D1 and seed files, leaving its password hash completely untouched.
 
 - **2. Decoupled State Gating & Auto-Promotion (Migration 027)**:
-  - Created `d1/migrations/027_retire_judge5_rename_ai_judge.sql` to update judge accounts, retire Judge 5, and auto-promote existing draft memes where Judge 4 had succeeded to `human_ready` / `archived`.
+  - Created `d1/migrations/027_retire_judge5_rename_ai_judge.sql` to purge Judge 5, update `ai-judge`, and auto-promote existing draft memes where Judge 4 had succeeded to `human_ready` / `archived`.
   - Updated `functions/api/curate/advisory-save.ts` and `functions/api/admin/ingestion/process.ts` to promote memes immediately when Judge 4 succeeds (`if (hasJ4)`). Human curators receive memes without waiting for a second AI.
   - Reduced ingestion intake placeholders in `functions/api/admin/ingestion/batches.ts` and `drive-cron.ts` from 2 rows to 1 row (`judge4`), cutting intake D1 writes by 50%.
 
@@ -582,11 +582,11 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
   - Displays `➔ ADOPT AI EVALUATION [SPACE / ENTER]` on desktop and `➔ ADOPT AI EVALUATION (SWIPE ← / →)` on mobile.
   - Dedicated inspection workspace for AI Judge operators with isolated single-item test evaluation and prompt contract inspection.
 
-- **6. SuperAdmin Audit & Historical Continuity**:
-  - Zero data loss: all historical reviews and evaluations by Judge 5 are strictly preserved in `meme_curation` and `ingestion_ai_evaluations`.
-  - SuperAdmin summary and progress breakdown cleanly accounts for all 5 judge columns, displaying Judge 5 with a `(Retired)` tag and retaining all exclude and purge statistics.
+- **6. SuperAdmin Audit & Complete Cleanliness**:
+  - Completely removed Judge 5 columns, filters, and joins from `summary.ts`, `memes.ts`, and `CurateSuperDashboard.tsx`.
+  - SuperAdmin summary now cleanly tracks all 4 configured judges: 3 Human Judges (Judges 1–3) + 1 AI Judge (`ai-judge`), with zero obsolete rows or stale counters.
 
 - **7. Verification & Automated Tests**:
-  - Updated `tests/aiJudgeQueues.test.ts` to test single AI Judge (Judge 4) promotion logic.
+  - Updated `tests/aiJudgeQueues.test.ts` and `tests/curationConsensus.test.mjs` to remove Judge 5.
   - Full test suite passing: 31 Vitest tests + 9 Node consensus tests (40/40 tests passing).
-  - Production build: `npm run build` compiled 1,719 modules cleanly with zero errors in 9.77s.
+  - Production build: `npm run build` compiled 1,719 modules cleanly with zero errors in 8.45s.

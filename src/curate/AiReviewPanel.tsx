@@ -3,9 +3,8 @@ import type { CuratedMemeData } from "./curateTypes";
 
 interface AiReviewPanelProps {
   j4?: CuratedMemeData | null;
-  j5?: CuratedMemeData | null;
   onEnterOverride: () => void;
-  onAdopt: (j: CuratedMemeData, source: "judge4" | "judge5" | "consensus") => void;
+  onAdopt: (j: CuratedMemeData, source: "judge4" | "consensus") => void;
   onForceRemove: () => void;
   isMobile?: boolean;
   isAiJudge?: boolean;
@@ -17,7 +16,6 @@ interface AiReviewPanelProps {
 
 export default function AiReviewPanel({
   j4,
-  j5,
   onEnterOverride,
   onAdopt,
   onForceRemove,
@@ -30,10 +28,8 @@ export default function AiReviewPanel({
 }: AiReviewPanelProps) {
   const [showContract, setShowContract] = useState(false);
 
-  // In the single-AI-judge model, Judge 4 (AI Judge) is the sole active authority.
-  // Historical J5 data is used only as fallback if J4 is not yet present on legacy memes.
-  const ai = j4?.corpus_status ? j4 : (j5?.corpus_status ? j5 : null);
-  const adoptSource: "judge4" | "judge5" = j4?.corpus_status ? "judge4" : "judge5";
+  const ai = j4?.corpus_status ? j4 : null;
+  const adoptSource: "judge4" = "judge4";
   const hasAi = Boolean(ai?.corpus_status);
 
   const isKeep = ai?.corpus_status === "keep";

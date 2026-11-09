@@ -41,16 +41,15 @@ const MECHANISM_ORDER = [
   "Relatability", "Absurdity", "Irony", "Satire", "Exaggeration", "Cringe", "Dark Humour", "Parody", "Surrealism",
 ];
 
-function aiFallbackValue<T>(j4: T | null | undefined, j5: T | null | undefined, fallback: T): T {
+function aiFallbackValue<T>(j4: T | null | undefined, fallback: T): T {
   if (j4 == null) return fallback;
-  return j5 != null && JSON.stringify(j4) === JSON.stringify(j5) ? j4 : j4;
+  return j4;
 }
 
 function resolveSingleField(
   votes: HumanVote[],
   value: (vote: HumanVote) => string | null,
   ai4: string | null | undefined,
-  ai5: string | null | undefined,
 ): string | null {
   const counts = new Map<string, number>();
   for (const vote of votes) {
@@ -58,14 +57,13 @@ function resolveSingleField(
     if (candidate) counts.set(candidate, (counts.get(candidate) ?? 0) + 1);
   }
   const majority = [...counts.entries()].find(([, count]) => count >= 2)?.[0];
-  return majority ?? aiFallbackValue(ai4, ai5, null);
+  return majority ?? aiFallbackValue(ai4, null);
 }
 
 function resolveMultiField(
   votes: HumanVote[],
   value: (vote: HumanVote) => string[],
   ai4: string[] | null | undefined,
-  ai5: string[] | null | undefined,
   order: string[],
   max: number,
 ): string[] {
@@ -85,7 +83,7 @@ function resolveMultiField(
     .map(([option]) => option);
 
   if (ranked.length > 0) return ranked;
-  return aiFallbackValue(ai4, ai5, [])?.slice(0, max) ?? [];
+  return aiFallbackValue(ai4, [])?.slice(0, max) ?? [];
 }
 
 export function resolveHumanConsensus(votes: HumanVote[], ai: AiFallback = {}): ConsensusResult {
@@ -126,13 +124,12 @@ export function resolveHumanConsensus(votes: HumanVote[], ai: AiFallback = {}): 
     kind: "finalize",
     corpus_status: statusWinner,
     duplicate_of: duplicateOf,
-    topics: resolveMultiField(uniqueVotes, (vote) => vote.topics, ai.judge4?.topics, ai.judge5?.topics, TOPIC_ORDER, 3),
-    tone: resolveSingleField(uniqueVotes, (vote) => vote.tone, ai.judge4?.tone, ai.judge5?.tone),
+    topics: resolveMultiField(uniqueVotes, (vote) => vote.topics, ai.judge4?.topics, TOPIC_ORDER, 3),
+    tone: resolveSingleField(uniqueVotes, (vote) => vote.tone, ai.judge4?.tone),
     humour_mechanisms: resolveMultiField(
       uniqueVotes,
       (vote) => vote.humour_mechanisms,
       ai.judge4?.humour_mechanisms,
-      ai.judge5?.humour_mechanisms,
       MECHANISM_ORDER,
       2,
     ),

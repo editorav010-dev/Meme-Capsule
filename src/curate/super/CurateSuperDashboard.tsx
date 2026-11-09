@@ -263,7 +263,7 @@ export default function CurateSuperDashboard({
                   CURATOR / JUDGES LIVE PROGRESS ({summary.judges.length} ACTIVE)
                 </h3>
                 <span style={{ fontSize: "11px", color: "#888", fontFamily: "monospace" }}>
-                  (Judges 1–3: Human Consensus • Judges 4–5: AI Advisory)
+                  (Judges 1–3: Human Consensus • AI Judge: Advisory Pre-Evaluation)
                 </span>
               </div>
               <button
@@ -276,7 +276,7 @@ export default function CurateSuperDashboard({
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
               {summary.judges.map((j) => {
-                const isAiJudge = j.user_name.toLowerCase().includes("four") || j.user_name.toLowerCase().includes("five") || j.user_name.toLowerCase().includes("ai");
+                const isAiJudge = j.user_name.toLowerCase().includes("four") || j.user_name.toLowerCase().includes("ai") || j.user_id === "user-judge4";
                 return (
                   <div key={j.user_id} style={{ background: "#222", border: isAiJudge ? "1px dashed #555" : "1px solid #3d3d3d", padding: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>

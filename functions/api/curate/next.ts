@@ -472,19 +472,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       });
     }
 
-    // 5. Fetch Judge 4 and Judge 5 judgements for all fetched memes in a single query
+    // 5. Fetch AI Judge (judge4) judgements for all fetched memes in a single query
     const targetIds = targetRows.map((r) => r.id);
     const placeholders = targetIds.map(() => "?").join(", ");
     const aiRows = await env.DB.prepare(`
       SELECT * FROM meme_curation 
-      WHERE meme_id IN (${placeholders}) AND user_id IN ('user-judge4', 'user-judge5')
+      WHERE meme_id IN (${placeholders}) AND user_id = 'user-judge4'
     `).bind(...targetIds).all();
 
-    const aiRowsMap = new Map<string, { judge4?: any; judge5?: any }>();
+    const aiRowsMap = new Map<string, { judge4?: any }>();
     for (const r of (aiRows.results || []) as any[]) {
       const existing = aiRowsMap.get(r.meme_id) || {};
       if (r.user_id === "user-judge4") existing.judge4 = r;
-      if (r.user_id === "user-judge5") existing.judge5 = r;
       aiRowsMap.set(r.meme_id, existing);
     }
 
@@ -529,7 +528,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         ai_prediction: buildAIPrediction(targetMeme),
         ai_judgements: {
           judge4: formatAiCuration(aiData.judge4),
-          judge5: formatAiCuration(aiData.judge5),
         },
       };
     });

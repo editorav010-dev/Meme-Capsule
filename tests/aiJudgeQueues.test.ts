@@ -84,14 +84,6 @@ describe("AI Judge Queue & Batch Curation Workflow", () => {
       ])
     ).toBe(true);
 
-    // J4 succeeded even if legacy J5 row is pending -> PROMOTED to human_ready
-    expect(
-      checkSingleAiCompletion([
-        { judge_key: "judge4", state: "succeeded" },
-        { judge_key: "judge5", state: "pending" },
-      ])
-    ).toBe(true);
-
     // J4 failed -> NOT human_ready
     expect(
       checkSingleAiCompletion([

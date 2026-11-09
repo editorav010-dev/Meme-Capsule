@@ -35,13 +35,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         COUNT(j.job_id) as total_jobs,
         SUM(CASE WHEN j.upload_state = 'uploaded' AND (j.duplicate_of_job_id IS NULL OR j.duplicate_of_job_id LIKE 'replace:%') THEN 1 ELSE 0 END) AS valid_drafts,
         SUM(CASE WHEN j.upload_state = 'failed' THEN 1 ELSE 0 END) AS failed_uploads,
-        SUM(CASE WHEN e4.state = 'succeeded' THEN 1 ELSE 0 END) AS j4_completed,
-        SUM(CASE WHEN e5.state = 'succeeded' THEN 1 ELSE 0 END) AS j5_completed,
-        SUM(CASE WHEN e4.state = 'succeeded' AND e5.state = 'succeeded' THEN 1 ELSE 0 END) AS both_completed
+        SUM(CASE WHEN e4.state = 'succeeded' THEN 1 ELSE 0 END) AS j4_completed
       FROM ingestion_batches b
       LEFT JOIN ingestion_jobs j ON b.id = j.batch_id
       LEFT JOIN ingestion_ai_evaluations e4 ON j.job_id = e4.job_id AND e4.judge_key = 'judge4'
-      LEFT JOIN ingestion_ai_evaluations e5 ON j.job_id = e5.job_id AND e5.judge_key = 'judge5'
       WHERE b.status != 'cancelled'
       GROUP BY b.id
       ORDER BY b.created_at DESC
@@ -51,8 +48,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const batches = (results || []).map((row: any) => {
       const validDrafts = Number(row.valid_drafts || 0);
       const j4Completed = Number(row.j4_completed || 0);
-      const j5Completed = Number(row.j5_completed || 0);
-      const bothCompleted = Number(row.both_completed || 0);
 
       return {
         id: row.id,
@@ -65,10 +60,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         judge4: {
           completed: j4Completed,
           remaining: Math.max(0, validDrafts - j4Completed),
-        },
-        judge5: {
-          completed: j5Completed,
-          remaining: 0,
         },
         both_completed: j4Completed,
         percent_complete: validDrafts > 0 ? Math.min(100, Math.round((j4Completed / validDrafts) * 100)) : 0,

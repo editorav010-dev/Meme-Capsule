@@ -23,7 +23,7 @@ interface AdvisorySavePayload {
   confidence?: number;
   model?: string;
   latency_ms?: number;
-  judge_key?: "judge4" | "judge5";
+  judge_key?: "judge4";
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -50,9 +50,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     let userId: string;
     let userName: string;
 
-    if (sessionUser.id === "user-judge5" || payload.judge_key === "judge5") {
-      return json({ error: "Judge 5 is retired. Only AI Judge or SuperAdmin may submit advisory evaluations." }, { status: 403 });
-    }
 
     if (sessionUser.id === "user-judge4" || sessionUser.username === "ai-judge" || sessionUser.username === "judge4" || payload.judge_key === "judge4") {
       judgeKey = "judge4";

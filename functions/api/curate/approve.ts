@@ -90,7 +90,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const { results: judgeRows } = await env.DB.prepare(`
       SELECT id, username, display_name
       FROM cat_users
-      WHERE role = 'judge' AND (username IN ('judge1', 'judge2', 'judge3', 'judge4', 'judge5', 'ai-judge') OR id = 'user-judge4')
+      WHERE role = 'judge' AND (username IN ('judge1', 'judge2', 'judge3', 'judge4', 'ai-judge') OR id = 'user-judge4')
     `).all<JudgeIdentity>();
     const judgeByUsername = new Map((judgeRows || []).map((judge) => [judge.username, judge]));
     const humanJudges = ["judge1", "judge2", "judge3"].map((username) => judgeByUsername.get(username));
@@ -100,7 +100,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const humanJudgeIdentities = humanJudges as JudgeIdentity[];
     const humanJudgeIds = humanJudgeIdentities.map((judge) => judge.id);
     const judge4 = judgeByUsername.get("ai-judge") || judgeByUsername.get("judge4") || (judgeRows || []).find((j) => j.id === "user-judge4");
-    const judge5 = judgeByUsername.get("judge5");
+
 
     if (sessionUser && (sessionUser.role !== "judge" || !humanJudgeIds.includes(sessionUser.id))) {
       return json({ error: "Only Judges 1, 2, or 3 may submit a human curation vote." }, { status: 403 });
@@ -150,7 +150,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       now,
     );
 
-    const aiJudgeIds = [judge4?.id, judge5?.id].filter((id): id is string => Boolean(id));
+    const aiJudgeIds = [judge4?.id].filter((id): id is string => Boolean(id));
     const voteIds = [...humanJudgeIds, ...aiJudgeIds];
     const placeholders = voteIds.map(() => "?").join(", ");
     const stmtVotes = env.DB.prepare(`
@@ -199,7 +199,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     } : null;
     const ai: AiFallback = {
       judge4: aiDecision(aiRow(judge4?.id)),
-      judge5: aiDecision(aiRow(judge5?.id)),
+
     };
     const consensus = resolveHumanConsensus(votes, ai);
 

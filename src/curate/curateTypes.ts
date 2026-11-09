@@ -84,7 +84,6 @@ export interface CurateMemeItem {
   } | null;
   ai_judgements?: {
     judge4?: CuratedMemeData | null;
-    judge5?: CuratedMemeData | null;
   };
 }
 

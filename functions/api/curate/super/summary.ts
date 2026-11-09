@@ -72,7 +72,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       resolvedExcludedCount = 0;
     }
 
-    // 3. Per-judge progress breakdown (All 5 configured judges: 3 Human + 2 AI)
+    // 3. Per-judge progress breakdown (All 4 configured judges: 3 Human + 1 AI)
     // Using LEFT JOIN on cat_users ensures every judge is represented even with 0 reviews
     const { results: judgeResults } = await env.DB.prepare(`
       SELECT 
@@ -86,7 +86,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         MAX(c.reviewed_at) as last_active
       FROM cat_users u
       LEFT JOIN meme_curation c ON c.user_id = u.id
-      WHERE u.username IN ('judge1', 'judge2', 'judge3', 'judge4', 'judge5', 'ai-judge')
+      WHERE u.username IN ('judge1', 'judge2', 'judge3', 'judge4', 'ai-judge')
       GROUP BY u.id, u.display_name, u.username
       ORDER BY 
         CASE u.username
@@ -95,8 +95,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           WHEN 'judge3' THEN 3
           WHEN 'judge4' THEN 4
           WHEN 'ai-judge' THEN 4
-          WHEN 'judge5' THEN 5
-          ELSE 6
+          ELSE 5
         END ASC
     `).all<JudgeCountRow>();
 
@@ -120,11 +119,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const judges = (judgeResults || []).map((j) => {
       const purged = forceRemovedMap.get(j.user_id) || 0;
       const activeReviewed = j.total_reviewed || 0;
-      const isJudge5 = j.user_id === "user-judge5";
       const isAiJudge = j.user_id === "user-judge4";
       return {
         ...j,
-        user_name: isJudge5 ? "Judge Five (Retired)" : (isAiJudge ? "AI Judge" : j.user_name),
+        user_name: isAiJudge ? "AI Judge" : j.user_name,
         total_reviewed: activeReviewed + purged,
         active_reviewed: activeReviewed,
         kept: j.kept || 0,

@@ -104,7 +104,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     // AI judges are strictly prohibited from mutating canonical media
-    if (sessionUser.username === "ai-judge" || sessionUser.username === "judge4" || sessionUser.username === "judge5") {
+    if (sessionUser.username === "ai-judge" || sessionUser.username === "judge4") {
       return json({ error: "AI judges are strictly advisory and cannot modify media." }, { status: 403 });
     }
 

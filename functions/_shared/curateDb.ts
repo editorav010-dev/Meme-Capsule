@@ -69,8 +69,7 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
         ('user-judge1',     'judge1',     'Judge One',    '${DEFAULT_PASS_HASH}', 'judge',      1),
         ('user-judge2',     'judge2',     'Judge Two',    '${DEFAULT_PASS_HASH}', 'judge',      1),
         ('user-judge3',     'judge3',     'Judge Three',  '${DEFAULT_PASS_HASH}', 'judge',      1),
-        ('user-judge4',     'ai-judge',   'AI Judge',     '${DEFAULT_PASS_HASH}', 'judge',      1),
-        ('user-judge5',     'judge5',     'Judge Five',   '${DEFAULT_PASS_HASH}', 'judge',      0);
+        ('user-judge4',     'ai-judge',   'AI Judge',     '${DEFAULT_PASS_HASH}', 'judge',      1);
 
       -- 4. Multi-User Meme Curation Table
       CREATE TABLE IF NOT EXISTS meme_curation (
@@ -161,7 +160,12 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
 
     try {
       await db.prepare("UPDATE cat_users SET username = 'ai-judge', display_name = 'AI Judge' WHERE id = 'user-judge4'").run();
-      await db.prepare("UPDATE cat_users SET is_active = 0 WHERE id = 'user-judge5'").run();
+      await db.prepare("DELETE FROM cat_judge_ai_presets WHERE user_id = 'user-judge5'").run();
+      await db.prepare("DELETE FROM meme_curation WHERE user_id = 'user-judge5' OR user_name = 'Judge Five'").run();
+      await db.prepare("DELETE FROM ingestion_ai_evaluations WHERE judge_key = 'judge5'").run();
+      await db.prepare("DELETE FROM meme_force_removals WHERE removed_by = 'user-judge5'").run();
+      await db.prepare("DELETE FROM cat_sessions WHERE user_id = 'user-judge5'").run();
+      await db.prepare("DELETE FROM cat_users WHERE id = 'user-judge5' OR username = 'judge5'").run();
     } catch {
       // ignore
     }
