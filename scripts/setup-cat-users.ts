@@ -24,8 +24,7 @@ const defaultAccounts = [
   { username: "judge1",     display_name: "Judge One",    role: "judge",      defaultPass: "changeme123" },
   { username: "judge2",     display_name: "Judge Two",    role: "judge",      defaultPass: "changeme123" },
   { username: "judge3",     display_name: "Judge Three",  role: "judge",      defaultPass: "changeme123" },
-  { username: "judge4",     display_name: "Judge Four",   role: "judge",      defaultPass: "changeme123" },
-  { username: "judge5",     display_name: "Judge Five",   role: "judge",      defaultPass: "changeme123" }
+  { username: "ai-judge",   display_name: "AI Judge",     role: "judge",      defaultPass: "changeme123" }
 ];
 
 async function main() {

@@ -391,7 +391,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       "SELECT * FROM ingestion_ai_evaluations WHERE job_id = ? ORDER BY judge_key ASC"
     ).bind(jobId).all<IngestionEvaluationRow>();
 
-    for (const evaluation of evaluations.results || []) {
+    for (const evaluation of (evaluations.results || []).filter((e) => e.judge_key === "judge4")) {
       if (evaluation.state === "succeeded") continue;
       const evaluationNow = new Date().toISOString();
       const evaluationLease = new Date(Date.now() + INGESTION_LEASE_MS).toISOString();
@@ -413,7 +413,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       "SELECT * FROM ingestion_ai_evaluations WHERE job_id = ? ORDER BY judge_key ASC"
     ).bind(jobId).all<IngestionEvaluationRow>();
     const finalRows = finalEvaluations.results || [];
-    const allSucceeded = finalRows.length === 2 && finalRows.every((evaluation) => evaluation.state === "succeeded");
+    const j4Row = finalRows.find((e) => e.judge_key === "judge4");
+    const allSucceeded = j4Row?.state === "succeeded";
     if (allSucceeded) {
       await env.DB.prepare(`
         UPDATE ingestion_jobs
@@ -422,18 +423,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         WHERE job_id = ?
       `).bind(new Date().toISOString(), new Date().toISOString(), jobId).run();
 
-      // Promote private meme from draft to archived with curation_status = NULL now that both advisory AI evaluations succeeded
+      // Promote private meme from draft to archived with curation_status = NULL now that AI advisory evaluation succeeded
       await env.DB.prepare(`
         UPDATE memes
         SET status = 'archived', is_active = 0, curation_status = NULL
         WHERE id = ? AND status = 'draft'
       `).bind(job.meme_id).run();
 
-      const preview = finalRows.find((evaluation) => evaluation.judge_key === "judge4") || finalRows[0];
+      const preview = j4Row || finalRows[0];
       if (preview) await writeLegacyAdvisoryPreview(env, job, preview);
     } else {
-      const hasTerminalFailure = finalRows.some((evaluation) => evaluation.state === "failed");
-      const hasRetry = finalRows.some((evaluation) => evaluation.state === "retry_wait" || evaluation.state === "pending");
+      const hasTerminalFailure = j4Row?.state === "failed";
+      const hasRetry = j4Row?.state === "retry_wait" || j4Row?.state === "pending";
       await env.DB.prepare(`
         UPDATE ingestion_jobs
         SET state = ?, error_code = ?, error_message = ?, lease_owner = NULL,
@@ -442,7 +443,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       `).bind(
         hasTerminalFailure ? "failed" : hasRetry ? "retry_wait" : "queued",
         hasTerminalFailure ? "advisory_evaluation_failed" : "advisory_evaluation_pending",
-        hasTerminalFailure ? "One or more advisory evaluations failed. Retry the failed item after correcting its configuration." : "One or more advisory evaluations are waiting for another attempt.",
+        hasTerminalFailure ? "AI advisory evaluation failed. Retry the failed item after correcting its configuration." : "AI advisory evaluation is waiting for another attempt.",
         new Date().toISOString(),
         jobId
       ).run();

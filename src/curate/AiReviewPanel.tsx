@@ -29,247 +29,73 @@ export default function AiReviewPanel({
   activeModel = "Vision Model"
 }: AiReviewPanelProps) {
   const [showContract, setShowContract] = useState(false);
-  const hasJ4 = Boolean(j4?.corpus_status);
-  const hasJ5 = Boolean(j5?.corpus_status);
 
-  // Both AIs evaluated
-  const bothEvaluated = hasJ4 && hasJ5;
-  const isStatusConsensus = bothEvaluated && j4!.corpus_status === j5!.corpus_status;
+  // In the single-AI-judge model, Judge 4 (AI Judge) is the sole active authority.
+  // Historical J5 data is used only as fallback if J4 is not yet present on legacy memes.
+  const ai = j4?.corpus_status ? j4 : (j5?.corpus_status ? j5 : null);
+  const adoptSource: "judge4" | "judge5" = j4?.corpus_status ? "judge4" : "judge5";
+  const hasAi = Boolean(ai?.corpus_status);
 
-  const topicsMatch = bothEvaluated && JSON.stringify([...j4!.topics].sort()) === JSON.stringify([...j5!.topics].sort());
-  const mechsMatch = bothEvaluated && JSON.stringify([...j4!.humour_mechanisms].sort()) === JSON.stringify([...j5!.humour_mechanisms].sort());
-  const toneMatch = bothEvaluated && j4!.tone === j5!.tone;
-  const allDetailsMatch = isStatusConsensus && (j4!.corpus_status === "excluded" || (topicsMatch && mechsMatch && toneMatch));
-
-  const renderJudgeCard = (
-    judgeName: string,
-    j: CuratedMemeData,
-    shortcut: string,
-    source: "judge4" | "judge5"
-  ) => {
-    const isKeep = j.corpus_status === "keep";
-    const isExcluded = j.corpus_status === "excluded";
-    const statusColor = isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#FF9F0A";
-
-    return (
-      <div
-        style={{
-          background: "#1c1b1b",
-          border: `2px solid ${statusColor}`,
-          padding: "16px",
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          boxShadow: `3px 3px 0px ${statusColor}`,
-          borderRadius: "2px"
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "8px" }}>
-          <span style={{ fontSize: "16px", fontWeight: "bold", color: isExcluded ? "#FF3B30" : "#c58cff", fontFamily: "Anton", letterSpacing: "0.5px" }}>
-            {judgeName}
-          </span>
-          <span
-            style={{
-              background: statusColor,
-              color: isKeep ? "#121212" : "#ffffff",
-              padding: "2px 8px",
-              fontFamily: "Anton",
-              fontSize: "14px",
-              borderRadius: "2px"
-            }}
-          >
-            {j.corpus_status.toUpperCase()}
-          </span>
-        </div>
-
-        <div style={{ fontSize: "13px", color: "#ddd", display: "flex", flexDirection: "column", gap: "4px" }}>
-          <div><span style={{ color: "#888", fontFamily: "monospace" }}>TOPICS:</span> {j.topics.length > 0 ? j.topics.join(", ") : <em style={{ color: "#666" }}>None</em>}</div>
-          <div><span style={{ color: "#888", fontFamily: "monospace" }}>TONE:</span> {j.tone || <em style={{ color: "#666" }}>None</em>}</div>
-          <div><span style={{ color: "#888", fontFamily: "monospace" }}>MECHS:</span> {j.humour_mechanisms.length > 0 ? j.humour_mechanisms.join(", ") : <em style={{ color: "#666" }}>None</em>}</div>
-          {j.curator_note && (
-            <div style={{ marginTop: "4px", fontSize: "11px", color: "#aaa", fontStyle: "italic" }}>
-              Note: {j.curator_note}
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => onAdopt(j, source)}
-          style={{
-            marginTop: "auto",
-            padding: "10px",
-            background: isExcluded ? "#FF3B30" : "#2a2a2a",
-            border: isExcluded ? "2px solid #ffffff" : "1px solid #c58cff",
-            color: "#ffffff",
-            fontFamily: "Anton",
-            fontSize: "15px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            transition: "all 0.15s ease",
-            boxShadow: isExcluded ? "2px 2px 0px #ffffff" : undefined
-          }}
-          title={`Adopt ${judgeName} decision [Key: ${shortcut}]`}
-        >
-          <span className="curate-key-pill" style={{ background: isExcluded ? "rgba(0,0,0,0.3)" : undefined }}>[{shortcut}]</span>
-          ADOPT {judgeName.toUpperCase()}
-        </button>
-      </div>
-    );
-  };
+  const isKeep = ai?.corpus_status === "keep";
+  const isExcluded = ai?.corpus_status === "excluded";
+  const statusColor = isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#FF9F0A";
 
   if (isMobile) {
     return (
       <div className="curate-mobile-ai-strip">
-        {bothEvaluated && isStatusConsensus && (
+        {hasAi ? (
           <div
             className="curate-mobile-ai-card"
             style={{
-              borderColor: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
-              boxShadow: `3px 3px 0px ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`
+              borderColor: statusColor,
+              boxShadow: `3px 3px 0px ${statusColor}`
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: "Anton", fontSize: "16px", color: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30", letterSpacing: "0.5px" }}>
-                ✓ AI CONSENSUS: {j4!.corpus_status.toUpperCase()}
-              </span>
-              <span style={{ fontSize: "10px", background: "#262626", color: "#f4c300", padding: "2px 6px", fontFamily: "monospace" }}>
-                J4 & J5 AGREE
-              </span>
-            </div>
-            {j4!.corpus_status === "keep" && (
-              <div style={{ fontSize: "11px", color: "#aaa", marginTop: "4px" }}>
-                {j4!.topics.join(", ") || "No topics"} · {j4!.tone || "No tone"}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-              <button
-                type="button"
-                onClick={() => onAdopt(j4!, "consensus")}
+              <span
                 style={{
-                  flex: 1,
-                  background: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
-                  color: j4!.corpus_status === "keep" ? "#121212" : "#ffffff",
-                  border: "none",
-                  padding: "8px",
                   fontFamily: "Anton",
-                  fontSize: "13px",
-                  cursor: "pointer",
+                  fontSize: "15px",
+                  color: statusColor,
                   letterSpacing: "0.5px"
                 }}
               >
-                ➔ ADOPT (SWIPE →)
-              </button>
-            </div>
-          </div>
-        )}
-
-        {bothEvaluated && !isStatusConsensus && (
-          <div
-            className="curate-mobile-ai-card"
-            style={{
-              borderColor: "#FF9F0A",
-              boxShadow: "3px 3px 0px #FF9F0A"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <span style={{ fontFamily: "Anton", fontSize: "15px", color: "#FF9F0A", letterSpacing: "0.5px" }}>
-                ⚠️ AI CONFLICT
+                {isExcluded ? "⛔ " : "🤖 "}AI PRE-JUDGEMENT: {ai!.corpus_status.toUpperCase()}
               </span>
-              <span style={{ fontSize: "10px", color: "#aaa" }}>
-                Swipe left/right to arbitrate
+              <span style={{ fontSize: "10px", color: "#aaa", fontFamily: "monospace" }}>
+                Swipe ← or → to adopt
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              <button
-                type="button"
-                onClick={() => onAdopt(j4!, "judge4")}
-                style={{
-                  background: j4!.corpus_status === "excluded" ? "#FF3B30" : "#1c1b1b",
-                  border: `2px solid ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`,
-                  color: "#fff",
-                  padding: "8px",
-                  fontFamily: "Anton",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  textAlign: "center",
-                  boxShadow: j4!.corpus_status === "excluded" ? "2px 2px 0px #ffffff" : undefined
-                }}
-              >
-                <div style={{ color: j4!.corpus_status === "excluded" ? "#ffffff" : "#c58cff" }}>J4 → {j4!.corpus_status.toUpperCase()}</div>
-                <div style={{ fontSize: "10px", color: j4!.corpus_status === "excluded" ? "#ffe" : "#34C759", marginTop: "2px" }}>SWIPE RIGHT →</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onAdopt(j5!, "judge5")}
-                style={{
-                  background: j5!.corpus_status === "excluded" ? "#FF3B30" : "#1c1b1b",
-                  border: `2px solid ${j5!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`,
-                  color: "#fff",
-                  padding: "8px",
-                  fontFamily: "Anton",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  textAlign: "center",
-                  boxShadow: j5!.corpus_status === "excluded" ? "2px 2px 0px #ffffff" : undefined
-                }}
-              >
-                <div style={{ color: j5!.corpus_status === "excluded" ? "#ffffff" : "#c58cff" }}>J5 → {j5!.corpus_status.toUpperCase()}</div>
-                <div style={{ fontSize: "10px", color: j5!.corpus_status === "excluded" ? "#ffe" : "#5AC8FA", marginTop: "2px" }}>← SWIPE LEFT</div>
-              </button>
-            </div>
-          </div>
-        )}
 
-        {((hasJ4 && !hasJ5) || (!hasJ4 && hasJ5)) && (() => {
-          const singleJudge = j4 || j5!;
-          const isJ4 = hasJ4;
-          const isKeep = singleJudge.corpus_status === "keep";
-          const isExcluded = singleJudge.corpus_status === "excluded";
-          const borderColor = isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#f4c300";
-          return (
-            <div
-              className="curate-mobile-ai-card"
+            <div style={{ fontSize: "11px", color: "#aaa", marginTop: "4px" }}>
+              {ai!.topics.length > 0 ? ai!.topics.join(", ") : "No topics"} · {ai!.tone || "No tone"}
+              {ai!.curator_note && (
+                <div style={{ marginTop: "3px", color: "#888", fontStyle: "italic" }}>
+                  &ldquo;{ai!.curator_note}&rdquo;
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onAdopt(ai!, adoptSource)}
               style={{
-                borderColor: borderColor,
-                boxShadow: `3px 3px 0px ${borderColor}`
+                width: "100%",
+                marginTop: "8px",
+                background: isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#FF9F0A",
+                color: isKeep ? "#121212" : "#ffffff",
+                border: isExcluded ? "2px solid #ffffff" : "none",
+                padding: "8px",
+                fontFamily: "Anton",
+                fontSize: "13px",
+                cursor: "pointer",
+                boxShadow: isExcluded ? "2px 2px 0px #ffffff" : undefined
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: "Anton", fontSize: "15px", color: borderColor, letterSpacing: "0.5px" }}>
-                  {isExcluded ? "⛔ " : "🔶 "}{isJ4 ? "AI JUDGE 4" : "AI JUDGE 5"}: {singleJudge.corpus_status.toUpperCase()}
-                </span>
-                <span style={{ fontSize: "10px", color: isExcluded ? "#FF3B30" : "#aaa", fontFamily: "monospace" }}>
-                  Swipe {isJ4 ? "→" : "←"} to adopt
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onAdopt(singleJudge, isJ4 ? "judge4" : "judge5")}
-                style={{
-                  width: "100%",
-                  marginTop: "8px",
-                  background: isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#f4c300",
-                  color: isExcluded ? "#ffffff" : "#121212",
-                  border: isExcluded ? "2px solid #ffffff" : "none",
-                  padding: "8px",
-                  fontFamily: "Anton",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                  boxShadow: isExcluded ? "2px 2px 0px #ffffff" : undefined
-                }}
-              >
-                ADOPT {isJ4 ? "J4 (SWIPE →)" : "J5 (SWIPE ←)"}
-              </button>
-            </div>
-          );
-        })()}
-
-        {!hasJ4 && !hasJ5 && (
+              ➔ ADOPT AI EVALUATION (SWIPE ← / →)
+            </button>
+          </div>
+        ) : (
           <div
             className="curate-mobile-ai-card"
             style={{
@@ -301,21 +127,22 @@ export default function AiReviewPanel({
                     cursor: isTesting ? "wait" : "pointer"
                   }}
                 >
-                  {isTesting ? "⚡ EVALUATING..." : "⚡ TEST EVALUATE (AI)"}
+                  {isTesting ? "EVALUATING..." : "⚡ TEST EVALUATE (AI)"}
                 </button>
                 <button
                   type="button"
                   onClick={onEnterOverride}
                   style={{
                     background: "#222",
-                    color: "#aaa",
-                    border: "1px solid #444",
-                    padding: "6px 10px",
-                    fontSize: "11px",
+                    color: "#f4c300",
+                    border: "1px solid #f4c300",
+                    padding: "8px 12px",
+                    fontFamily: "Anton",
+                    fontSize: "12px",
                     cursor: "pointer"
                   }}
                 >
-                  Override
+                  EDIT
                 </button>
               </div>
             ) : (
@@ -323,17 +150,18 @@ export default function AiReviewPanel({
                 type="button"
                 onClick={onEnterOverride}
                 style={{
+                  width: "100%",
+                  marginTop: "6px",
                   background: "#9b30ff",
-                  color: "#fff",
+                  color: "#ffffff",
                   border: "none",
-                  padding: "6px 14px",
+                  padding: "8px",
                   fontFamily: "Anton",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  marginTop: "4px"
+                  fontSize: "13px",
+                  cursor: "pointer"
                 }}
               >
-                ✏️ OPEN MANUAL OVERRIDE
+                MANUAL CURATE (SWIPE ↑)
               </button>
             )}
           </div>
@@ -342,193 +170,109 @@ export default function AiReviewPanel({
     );
   }
 
+  // Desktop Rendering
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "20px" }}>
-      {/* 1. STATE A: FULL AI CONSENSUS */}
-      {bothEvaluated && isStatusConsensus && (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* 1. AI Advisory Card */}
+      {hasAi ? (
         <div
           style={{
             background: "#1c1b1b",
-            border: `2px solid ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`,
+            border: `2px solid ${statusColor}`,
             padding: "18px",
-            boxShadow: `4px 4px 0px ${j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30"}`
+            boxShadow: `4px 4px 0px ${statusColor}`
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <span
               style={{
-                fontSize: "20px",
-                color: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
+                fontSize: "18px",
+                color: statusColor,
                 fontFamily: "Anton",
                 letterSpacing: "1px"
               }}
             >
-              AI CONSENSUS: {j4!.corpus_status.toUpperCase()}
+              {isExcluded ? "⛔ " : "🤖 "}AI PRE-JUDGEMENT (ADVISORY): {ai!.corpus_status.toUpperCase()}
             </span>
-            <span style={{ fontSize: "11px", background: "#262626", color: "#f4c300", padding: "2px 8px", fontFamily: "monospace" }}>
-              JUDGE 4 & 5 AGREE
-            </span>
-          </div>
-
-          {allDetailsMatch ? (
-            <>
-              {j4!.corpus_status === "keep" && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", fontSize: "13px", color: "#ddd", marginBottom: "16px", background: "#121212", padding: "10px 14px", border: "1px solid #333" }}>
-                  <div><span style={{ color: "#888" }}>Topics:</span> {j4!.topics.join(", ") || "None"}</div>
-                  <div><span style={{ color: "#888" }}>Tone:</span> {j4!.tone || "None"}</div>
-                  <div><span style={{ color: "#888" }}>Mechanisms:</span> {j4!.humour_mechanisms.join(", ") || "None"}</div>
-                </div>
-              )}
-              {j4!.corpus_status === "excluded" && (
-                <div style={{ fontSize: "13px", color: "#aaa", marginBottom: "14px" }}>
-                  Both AI Judge 4 and Judge 5 have analyzed this meme and determined it should be excluded from the active collection.
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => onAdopt(j4!, "consensus")}
-                style={{
-                  width: "100%",
-                  background: j4!.corpus_status === "keep" ? "#34C759" : "#FF3B30",
-                  color: j4!.corpus_status === "keep" ? "#121212" : "#ffffff",
-                  border: "2px solid #ffffff",
-                  padding: "14px",
-                  fontFamily: "Anton",
-                  fontSize: "18px",
-                  cursor: "pointer",
-                  letterSpacing: "0.5px",
-                  boxShadow: "3px 3px 0px #ffffff"
-                }}
-              >
-                ➔ APPROVE AI CONSENSUS [SPACE / ENTER]
-              </button>
-            </>
-          ) : (
-            <div>
-              <div style={{ color: "#f4c300", fontSize: "13px", marginBottom: "14px" }}>
-                Both AIs agree on <strong>{j4!.corpus_status.toUpperCase()}</strong>, but categorization details differ. Press [4] or [5] to pick taxonomy, or press [SPACE/ENTER] to adopt AI 4:
-              </div>
-              <div style={{ display: "flex", gap: "14px" }}>
-                {renderJudgeCard("AI Judge 4", j4!, "4", "judge4")}
-                {renderJudgeCard("AI Judge 5", j5!, "5", "judge5")}
-              </div>
-              <button
-                type="button"
-                onClick={() => onAdopt(j4!, "judge4")}
-                style={{
-                  width: "100%",
-                  marginTop: "12px",
-                  background: j4!.corpus_status === "excluded" ? "#FF3B30" : "#34C759",
-                  color: j4!.corpus_status === "excluded" ? "#ffffff" : "#121212",
-                  border: j4!.corpus_status === "excluded" ? "2px solid #ffffff" : "2px solid #f4c300",
-                  padding: "12px",
-                  fontFamily: "Anton",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  boxShadow: j4!.corpus_status === "excluded" ? "3px 3px 0px #ffffff" : undefined
-                }}
-              >
-                FAST-APPROVE J4 DECISION [SPACE / ENTER]
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 2. STATE B: AI DISAGREEMENT */}
-      {bothEvaluated && !isStatusConsensus && (
-        <div
-          style={{
-            background: "#1c1b1b",
-            border: "2px solid #FF9F0A",
-            padding: "18px",
-            boxShadow: "4px 4px 0px #FF9F0A"
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-            <span style={{ fontSize: "19px", color: "#FF9F0A", fontFamily: "Anton", letterSpacing: "1px" }}>
-              ⚠️ AI JUDGE DISAGREEMENT
-            </span>
-            <span style={{ fontSize: "11px", background: "#332211", color: "#FF9F0A", padding: "2px 8px", fontFamily: "monospace" }}>
-              CONFLICT DETECTED
-            </span>
-          </div>
-          <div style={{ fontSize: "13px", color: "#ccc", marginBottom: "14px" }}>
-            AI Judge 4 and AI Judge 5 reached different conclusions. Human judge authority required:
-          </div>
-          <div style={{ display: "flex", gap: "14px" }}>
-            {renderJudgeCard("AI Judge 4", j4!, "4", "judge4")}
-            {renderJudgeCard("AI Judge 5", j5!, "5", "judge5")}
-          </div>
-        </div>
-      )}
-
-      {/* 3. STATE SINGLE AI: ONLY ONE AI EVALUATED */}
-      {((hasJ4 && !hasJ5) || (!hasJ4 && hasJ5)) && (
-        (() => {
-          const singleJudge = j4 || j5!;
-          const judgeLabel = hasJ4 ? "AI Judge 4" : "AI Judge 5";
-          const source = hasJ4 ? "judge4" : "judge5";
-          const isKeep = singleJudge.corpus_status === "keep";
-          const isExcluded = singleJudge.corpus_status === "excluded";
-          const borderColor = isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#f4c300";
-
-          return (
-            <div
+            <span
               style={{
-                background: "#1c1b1b",
-                border: `2px solid ${borderColor}`,
-                padding: "18px",
-                boxShadow: `4px 4px 0px ${borderColor}`
+                fontSize: "11px",
+                background: isExcluded ? "#3a1414" : "#1a2a1a",
+                color: statusColor,
+                padding: "2px 8px",
+                fontFamily: "monospace",
+                border: `1px solid ${statusColor}`
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontSize: "18px", color: borderColor, fontFamily: "Anton", letterSpacing: "1px" }}>
-                  {isExcluded ? "⛔ " : ""}SINGLE AI EVALUATION: {judgeLabel.toUpperCase()} → {singleJudge.corpus_status.toUpperCase()}
-                </span>
-                <span style={{ fontSize: "11px", background: isExcluded ? "#3a1414" : "#332d18", color: borderColor, padding: "2px 8px", fontFamily: "monospace" }}>
-                  1 AI READY
-                </span>
-              </div>
+              AI ADVISORY
+            </span>
+          </div>
 
-              <div style={{ background: "#121212", border: "1px solid #333", padding: "12px", marginBottom: "14px", fontSize: "13px", color: "#ddd" }}>
-                <div><span style={{ color: "#888" }}>Status:</span> <strong style={{ color: isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#FF9F0A" }}>{singleJudge.corpus_status.toUpperCase()}</strong></div>
-                <div><span style={{ color: "#888" }}>Topics:</span> {singleJudge.topics.join(", ") || "None"}</div>
-                <div><span style={{ color: "#888" }}>Tone:</span> {singleJudge.tone || "None"}</div>
-                <div><span style={{ color: "#888" }}>Mechanisms:</span> {singleJudge.humour_mechanisms.join(", ") || "None"}</div>
-                {singleJudge.curator_note && (
-                  <div style={{ marginTop: "4px", fontSize: "11px", color: "#aaa", fontStyle: "italic" }}>
-                    Note: {singleJudge.curator_note}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onAdopt(singleJudge, source)}
+          <div
+            style={{
+              background: "#121212",
+              border: "1px solid #333",
+              padding: "12px",
+              marginBottom: "14px",
+              fontSize: "13px",
+              color: "#ddd",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px"
+            }}
+          >
+            <div>
+              <span style={{ color: "#888", fontFamily: "monospace" }}>STATUS:</span>{" "}
+              <strong style={{ color: statusColor }}>{ai!.corpus_status.toUpperCase()}</strong>
+            </div>
+            <div>
+              <span style={{ color: "#888", fontFamily: "monospace" }}>TOPICS:</span>{" "}
+              {ai!.topics.length > 0 ? ai!.topics.join(", ") : <em style={{ color: "#666" }}>None</em>}
+            </div>
+            <div>
+              <span style={{ color: "#888", fontFamily: "monospace" }}>TONE:</span>{" "}
+              {ai!.tone || <em style={{ color: "#666" }}>None</em>}
+            </div>
+            <div>
+              <span style={{ color: "#888", fontFamily: "monospace" }}>MECHS:</span>{" "}
+              {ai!.humour_mechanisms.length > 0 ? ai!.humour_mechanisms.join(", ") : <em style={{ color: "#666" }}>None</em>}
+            </div>
+            {ai!.curator_note && (
+              <div
                 style={{
-                  width: "100%",
-                  background: isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#f4c300",
-                  color: isExcluded ? "#ffffff" : "#121212",
-                  border: "2px solid #ffffff",
-                  padding: "14px",
-                  fontFamily: "Anton",
-                  fontSize: "18px",
-                  cursor: "pointer",
-                  letterSpacing: "0.5px",
-                  boxShadow: "3px 3px 0px #ffffff"
+                  marginTop: "6px",
+                  fontSize: "12px",
+                  color: "#aaa",
+                  fontStyle: "italic",
+                  borderTop: "1px dashed #333",
+                  paddingTop: "6px"
                 }}
               >
-                ➔ INSTANTLY ADOPT {judgeLabel.toUpperCase()} [SPACE / ENTER]
-              </button>
-            </div>
-          );
-        })()
-      )}
+                💬 AI Rationale: &ldquo;{ai!.curator_note}&rdquo;
+              </div>
+            )}
+          </div>
 
-      {/* 4. STATE NONE: NEITHER AI HAS EVALUATED */}
-      {!hasJ4 && !hasJ5 && (
+          <button
+            type="button"
+            onClick={() => onAdopt(ai!, adoptSource)}
+            style={{
+              width: "100%",
+              background: isKeep ? "#34C759" : isExcluded ? "#FF3B30" : "#FF9F0A",
+              color: isKeep ? "#121212" : "#ffffff",
+              border: "2px solid #ffffff",
+              padding: "14px",
+              fontFamily: "Anton",
+              fontSize: "18px",
+              cursor: "pointer",
+              letterSpacing: "0.5px",
+              boxShadow: "3px 3px 0px #ffffff"
+            }}
+          >
+            ➔ ADOPT AI EVALUATION [SPACE / ENTER]
+          </button>
+        </div>
+      ) : (
         <div
           style={{
             background: "#1c1b1b",
@@ -537,13 +281,21 @@ export default function AiReviewPanel({
             textAlign: "center"
           }}
         >
-          <div style={{ fontSize: "18px", color: isAiJudge ? "#00f0ff" : "#f4c300", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "8px" }}>
+          <div
+            style={{
+              fontSize: "18px",
+              color: isAiJudge ? "#00f0ff" : "#f4c300",
+              fontFamily: "Anton",
+              letterSpacing: "1px",
+              marginBottom: "8px"
+            }}
+          >
             {isAiJudge ? "⚡ DRAFT MEME — AWAITING AI EVALUATION" : "NO AI PRE-JUDGEMENT AVAILABLE"}
           </div>
           <p style={{ color: "#aaa", fontSize: "13px", margin: "0 0 16px 0" }}>
             {isAiJudge
               ? `This meme is queued for ${judgeName}. Run continuous batch above or test evaluate this individual meme.`
-              : "This meme has not been pre-evaluated by AI Judge 4 or Judge 5. Please curate manually."}
+              : "This meme has not been pre-evaluated by AI Judge. Please curate manually."}
           </p>
 
           {isAiJudge ? (

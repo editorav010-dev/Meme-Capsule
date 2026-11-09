@@ -61,14 +61,14 @@ export default function CurateApp() {
     }
   });
 
-  const isAiJudge = user?.id === "user-judge4" || user?.id === "user-judge5";
+  const isAiJudge = user?.id === "user-judge4" || user?.username === "ai-judge" || user?.username === "judge4";
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [batches, setBatches] = useState<CurateBatchItem[]>([]);
   const [loadingBatches, setLoadingBatches] = useState<boolean>(false);
 
   const [currentMeme, setCurrentMeme] = useState<CurateMemeItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [filterQueue, setFilterQueue] = useState<string>(() => (user?.id === "user-judge4" || user?.id === "user-judge5" ? "draft" : "unreviewed"));
+  const [filterQueue, setFilterQueue] = useState<string>(() => (user?.id === "user-judge4" || user?.username === "ai-judge" || user?.username === "judge4" ? "draft" : "unreviewed"));
   const [stats, setStats] = useState({ total: 4485, reviewed: 0, remaining: 4485, current_index: 1 });
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
   const [showAccountModal, setShowAccountModal] = useState<boolean>(false);
@@ -492,7 +492,7 @@ export default function CurateApp() {
           confidence: decision.confidence,
           model: decision.modelUsed,
           latency_ms: decision.latencyMs,
-          judge_key: user?.id === "user-judge5" ? "judge5" : "judge4"
+          judge_key: "judge4"
         });
         setStats((prev) => ({
           ...prev,
@@ -799,14 +799,14 @@ export default function CurateApp() {
     return nextMeme;
   }, [user, applyMemeToForm, filterQueue, selectedBatchId, refillPrefetchQueue]);
 
-  // Mobile Touch Gesture Actions
-  const handleSwipeRight = useCallback(async () => {
+  // Mobile Touch Gesture Actions: both left and right swiping gestures adopt AI Judge evaluation
+  const handleAdoptAiSwipe = useCallback(async (direction: "left" | "right") => {
     const s = stateRef.current;
-    const j4 = s.currentMeme?.ai_judgements?.judge4;
-    if (!j4?.corpus_status) return;
+    const aiJudge = s.currentMeme?.ai_judgements?.judge4 || s.currentMeme?.ai_judgements?.judge5;
+    if (!aiJudge?.corpus_status) return;
 
-    setSwipeAnimation("right");
-    const nextMeme = await handleApproveAndAdvance("judge4", j4.corpus_status, j4);
+    setSwipeAnimation(direction);
+    const nextMeme = await handleApproveAndAdvance("judge4", aiJudge.corpus_status, aiJudge);
     if (!nextMeme) {
       setSwipeAnimation(null);
     } else {
@@ -814,19 +814,8 @@ export default function CurateApp() {
     }
   }, [handleApproveAndAdvance]);
 
-  const handleSwipeLeft = useCallback(async () => {
-    const s = stateRef.current;
-    const j5 = s.currentMeme?.ai_judgements?.judge5;
-    if (!j5?.corpus_status) return;
-
-    setSwipeAnimation("left");
-    const nextMeme = await handleApproveAndAdvance("judge5", j5.corpus_status, j5);
-    if (!nextMeme) {
-      setSwipeAnimation(null);
-    } else {
-      setTimeout(() => setSwipeAnimation(null), 180);
-    }
-  }, [handleApproveAndAdvance]);
+  const handleSwipeRight = useCallback(() => handleAdoptAiSwipe("right"), [handleAdoptAiSwipe]);
+  const handleSwipeLeft = useCallback(() => handleAdoptAiSwipe("left"), [handleAdoptAiSwipe]);
 
   const handleDoubleTap = useCallback(() => {
     const s = stateRef.current;
@@ -1103,54 +1092,29 @@ export default function CurateApp() {
       if (!stateRef.current.overrideMode) {
         const j4 = stateRef.current.currentMeme?.ai_judgements?.judge4;
         const j5 = stateRef.current.currentMeme?.ai_judgements?.judge5;
-        const hasJ4 = Boolean(j4?.corpus_status);
-        const hasJ5 = Boolean(j5?.corpus_status);
+        const aiEvaluation = j4?.corpus_status ? j4 : (j5?.corpus_status ? j5 : null);
+        const adoptSource: "judge4" | "judge5" = j4?.corpus_status ? "judge4" : "judge5";
+        const hasAi = Boolean(aiEvaluation?.corpus_status);
 
-        const bothEvaluated = hasJ4 && hasJ5;
-        const isStatusConsensus = bothEvaluated && j4!.corpus_status === j5!.corpus_status;
-
-        // Space OR Enter: Fast Approve / Adopt
+        // Space OR Enter: Adopt AI Evaluation
         if (e.key === "Enter" || e.code === "Space") {
           e.preventDefault();
-          if (bothEvaluated && isStatusConsensus) {
-            // Full consensus: adopt consensus (defaults to J4 data)
-            handleApproveAndAdvance("consensus", j4!.corpus_status, j4!);
+          if (hasAi) {
+            handleApproveAndAdvance(adoptSource, aiEvaluation!.corpus_status, aiEvaluation!);
             return;
           }
-          if (hasJ4 && !hasJ5) {
-            // Single AI: instantly adopt J4
-            handleApproveAndAdvance("judge4", j4!.corpus_status, j4!);
+          if (isAiJudge) {
+            handleTestEvaluateCurrentMeme();
             return;
           }
-          if (!hasJ4 && hasJ5) {
-            // Single AI: instantly adopt J5
-            handleApproveAndAdvance("judge5", j5!.corpus_status, j5!);
-            return;
-          }
-          if (!hasJ4 && !hasJ5) {
-            // No AI evaluation ready: if AI judge, trigger isolated evaluation; otherwise open manual override
-            if (isAiJudge) {
-              handleTestEvaluateCurrentMeme();
-              return;
-            }
-            setOverrideMode(true);
-            return;
-          }
-          // In case of conflict, Enter/Space does not blind-adopt; user must press 4, 5, or O
+          setOverrideMode(true);
           return;
         }
 
-        // Key 4: Adopt AI Judge 4
-        if (key === "4" && hasJ4) {
+        // Key 4 or 5 fallback: Adopt AI Evaluation
+        if ((key === "4" || key === "5") && hasAi) {
           e.preventDefault();
-          handleApproveAndAdvance("judge4", j4!.corpus_status, j4!);
-          return;
-        }
-
-        // Key 5: Adopt AI Judge 5
-        if (key === "5" && hasJ5) {
-          e.preventDefault();
-          handleApproveAndAdvance("judge5", j5!.corpus_status, j5!);
+          handleApproveAndAdvance(adoptSource, aiEvaluation!.corpus_status, aiEvaluation!);
           return;
         }
 
@@ -1445,7 +1409,7 @@ export default function CurateApp() {
                         <option value="">No Ingestion Batches</option>
                       ) : (
                         batches.map((b) => {
-                          const judgeProg = user?.id === "user-judge5" ? b.judge5 : b.judge4;
+                          const judgeProg = b.judge4;
                           const shortId = b.id.replace(/^batch-/, "").slice(0, 8);
                           return (
                             <option key={b.id} value={b.id}>
@@ -1760,7 +1724,7 @@ export default function CurateApp() {
       )}
 
       {/* AI Judge Continuous Console — Visible to AI Judge operators (judge4, judge5) on Desktop only */}
-      {!isMobile && (user.username === "judge4" || user.username === "judge5") && (
+      {!isMobile && (user.username === "ai-judge" || user.username === "judge4" || user.id === "user-judge4") && (
         <div style={{ padding: "0 24px", maxWidth: "1600px", width: "100%", margin: "16px auto 0 auto" }}>
           <AiJudgeConsole
             userId={user?.id}
@@ -1860,14 +1824,14 @@ export default function CurateApp() {
                   gestures.swipePreview === "right" ? "visible" : ""
                 }`}
               >
-                ADOPT J4 ✓
+                ADOPT AI ✓
               </div>
               <div
                 className={`curate-swipe-indicator curate-swipe-indicator--left ${
                   gestures.swipePreview === "left" ? "visible" : ""
                 }`}
               >
-                ✓ ADOPT J5
+                ✓ ADOPT AI
               </div>
 
               <div className="curate-meme-display">
@@ -2348,17 +2312,14 @@ export default function CurateApp() {
       <footer className="curate-shortcuts-footer">
         {isMobile ? (
           <>
-            <span><span className="curate-hotkey-tag">→</span> ADOPT J4</span>
-            <span><span className="curate-hotkey-tag">←</span> ADOPT J5</span>
+            <span><span className="curate-hotkey-tag">← / →</span> ADOPT AI</span>
             <span><span className="curate-hotkey-tag">↑</span> OVERRIDE</span>
             <span><span className="curate-hotkey-tag">×2</span> FORCE REMOVE</span>
             <span><span className="curate-hotkey-tag">U</span> UNDO</span>
           </>
         ) : !overrideMode ? (
           <>
-            <span><span className="curate-hotkey-tag">SPACE / ENTER</span> APPROVE</span>
-            <span><span className="curate-hotkey-tag">4</span> ADOPT J4</span>
-            <span><span className="curate-hotkey-tag">5</span> ADOPT J5</span>
+            <span><span className="curate-hotkey-tag">SPACE / ENTER</span> ADOPT AI</span>
             <span><span className="curate-hotkey-tag">O</span> OVERRIDE</span>
             <span><span className="curate-hotkey-tag">SHIFT+DEL</span> FORCE REMOVE</span>
             <span><span className="curate-hotkey-tag">CTRL+Z / U</span> UNDO</span>

@@ -557,3 +557,36 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
 
 
 
+
+## 19. Transition to Single-AI-Judge Architecture & Judge 5 Retirement (November 10, 2026)
+
+- **1. Sole Active AI Authority (Judge 4 -> AI Judge)**:
+  - Retired `user-judge5` from the active curation workflow by setting `is_active = 0` (disables login, preserves all foreign keys and historical records).
+  - Renamed `user-judge4` to username `ai-judge` and display name `AI Judge` in D1 and seed files, leaving its password hash completely untouched.
+
+- **2. Decoupled State Gating & Auto-Promotion (Migration 027)**:
+  - Created `d1/migrations/027_retire_judge5_rename_ai_judge.sql` to update judge accounts, retire Judge 5, and auto-promote existing draft memes where Judge 4 had succeeded to `human_ready` / `archived`.
+  - Updated `functions/api/curate/advisory-save.ts` and `functions/api/admin/ingestion/process.ts` to promote memes immediately when Judge 4 succeeds (`if (hasJ4)`). Human curators receive memes without waiting for a second AI.
+  - Reduced ingestion intake placeholders in `functions/api/admin/ingestion/batches.ts` and `drive-cron.ts` from 2 rows to 1 row (`judge4`), cutting intake D1 writes by 50%.
+
+- **3. Desktop Human Curator Ergonomics (Space / Enter Adoption)**:
+  - Streamlined desktop review keyboard controls: pressing `[ Space ]` or `[ Enter ]` adopts the advisory AI evaluation and instantly advances to the next meme.
+  - Retained `[ O ]` for manual override and `[ Shift + Del ]` / `[ Shift + X ]` for force removal.
+
+- **4. Mobile Touch Gesture Modernization (Left & Right Swipe Adopt)**:
+  - Replaced the legacy directional split (right for J4 / left for J5). On mobile touch interfaces, horizontal swiping in **either direction (left or right)** now adopts the AI evaluation.
+  - Updated swipe visual indicators and bottom shortcut strip to display `ADOPT AI ✓` for both swipe directions.
+
+- **5. Unified AI Advisory Panel (`src/curate/AiReviewPanel.tsx`)**:
+  - Replaced dual-card comparison and conflict logic with a unified **AI Advisory Card** displaying status, topics, tone, humour mechanisms, confidence, and AI rationale.
+  - Displays `➔ ADOPT AI EVALUATION [SPACE / ENTER]` on desktop and `➔ ADOPT AI EVALUATION (SWIPE ← / →)` on mobile.
+  - Dedicated inspection workspace for AI Judge operators with isolated single-item test evaluation and prompt contract inspection.
+
+- **6. SuperAdmin Audit & Historical Continuity**:
+  - Zero data loss: all historical reviews and evaluations by Judge 5 are strictly preserved in `meme_curation` and `ingestion_ai_evaluations`.
+  - SuperAdmin summary and progress breakdown cleanly accounts for all 5 judge columns, displaying Judge 5 with a `(Retired)` tag and retaining all exclude and purge statistics.
+
+- **7. Verification & Automated Tests**:
+  - Updated `tests/aiJudgeQueues.test.ts` to test single AI Judge (Judge 4) promotion logic.
+  - Full test suite passing: 31 Vitest tests + 9 Node consensus tests (40/40 tests passing).
+  - Production build: `npm run build` compiled 1,719 modules cleanly with zero errors in 9.77s.

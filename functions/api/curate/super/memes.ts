@@ -158,13 +158,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         FROM meme_curation c
         JOIN cat_users u ON u.id = c.user_id
         WHERE c.meme_id IN (${placeholders})
-          AND u.username IN ('judge1', 'judge2', 'judge3', 'judge4', 'judge5')
+          AND (u.username IN ('judge1', 'judge2', 'judge3', 'judge4', 'judge5', 'ai-judge') OR u.id = 'user-judge4')
         ORDER BY 
           CASE u.username
             WHEN 'judge1' THEN 1
             WHEN 'judge2' THEN 2
             WHEN 'judge3' THEN 3
             WHEN 'judge4' THEN 4
+            WHEN 'ai-judge' THEN 4
             WHEN 'judge5' THEN 5
             ELSE 6
           END ASC

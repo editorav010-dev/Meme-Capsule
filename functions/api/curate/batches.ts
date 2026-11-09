@@ -68,10 +68,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         },
         judge5: {
           completed: j5Completed,
-          remaining: Math.max(0, validDrafts - j5Completed),
+          remaining: 0,
         },
-        both_completed: bothCompleted,
-        percent_complete: validDrafts > 0 ? Math.min(100, Math.round((bothCompleted / validDrafts) * 100)) : 0,
+        both_completed: j4Completed,
+        percent_complete: validDrafts > 0 ? Math.min(100, Math.round((j4Completed / validDrafts) * 100)) : 0,
       };
     });
 

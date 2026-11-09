@@ -71,36 +71,40 @@ describe("AI Judge Queue & Batch Curation Workflow", () => {
     ).toBe(false);
   });
 
-  it("advances ingestion job to human_ready and meme to archived only when both AI judges succeed", () => {
-    const checkDualAiCompletion = (evaluations: Array<{ judge_key: string; state: string }>) => {
+  it("advances ingestion job to human_ready and meme to archived when sole AI Judge (judge4) succeeds", () => {
+    const checkSingleAiCompletion = (evaluations: Array<{ judge_key: string; state: string }>) => {
       const j4 = evaluations.find((e) => e.judge_key === "judge4" && e.state === "succeeded");
-      const j5 = evaluations.find((e) => e.judge_key === "judge5" && e.state === "succeeded");
-      return Boolean(j4 && j5);
+      return Boolean(j4);
     };
 
-    // J4 succeeded, J5 still pending -> NOT human_ready
+    // J4 succeeded alone -> PROMOTED to human_ready (no longer blocked waiting for J5)
     expect(
-      checkDualAiCompletion([
+      checkSingleAiCompletion([
+        { judge_key: "judge4", state: "succeeded" },
+      ])
+    ).toBe(true);
+
+    // J4 succeeded even if legacy J5 row is pending -> PROMOTED to human_ready
+    expect(
+      checkSingleAiCompletion([
         { judge_key: "judge4", state: "succeeded" },
         { judge_key: "judge5", state: "pending" },
       ])
-    ).toBe(false);
-
-    // J4 failed, J5 succeeded -> NOT human_ready
-    expect(
-      checkDualAiCompletion([
-        { judge_key: "judge4", state: "failed" },
-        { judge_key: "judge5", state: "succeeded" },
-      ])
-    ).toBe(false);
-
-    // Both succeeded -> PROMOTED to human_ready
-    expect(
-      checkDualAiCompletion([
-        { judge_key: "judge4", state: "succeeded" },
-        { judge_key: "judge5", state: "succeeded" },
-      ])
     ).toBe(true);
+
+    // J4 failed -> NOT human_ready
+    expect(
+      checkSingleAiCompletion([
+        { judge_key: "judge4", state: "failed" },
+      ])
+    ).toBe(false);
+
+    // J4 pending -> NOT human_ready
+    expect(
+      checkSingleAiCompletion([
+        { judge_key: "judge4", state: "pending" },
+      ])
+    ).toBe(false);
   });
 
   it("resolves media proxy URL as reliable fallback when direct R2 URL is unconfigured", () => {

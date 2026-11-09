@@ -340,7 +340,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         now,
         now
       ));
-      for (const judgeKey of ["judge4", "judge5"] as const) {
+      for (const judgeKey of ["judge4"] as const) {
         statements.push(env.DB.prepare(`
           INSERT INTO ingestion_ai_evaluations (
             id, job_id, meme_id, judge_key, state, created_at, updated_at

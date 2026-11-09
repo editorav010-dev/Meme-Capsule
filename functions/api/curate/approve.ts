@@ -82,7 +82,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const ingestionState = await getIngestionJobState(env.DB, memeId);
     if (ingestionState && ingestionState !== "human_ready") {
       return json({
-        error: "This new intake item is not human-ready yet. Both advisory evaluations must succeed before a human vote is accepted.",
+        error: "This new intake item is not human-ready yet. The AI advisory evaluation must succeed before a human vote is accepted.",
         ingestion_state: ingestionState
       }, { status: 409 });
     }
@@ -90,8 +90,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const { results: judgeRows } = await env.DB.prepare(`
       SELECT id, username, display_name
       FROM cat_users
-      WHERE role = 'judge' AND username IN (?, ?, ?, ?, ?)
-    `).bind("judge1", "judge2", "judge3", "judge4", "judge5").all<JudgeIdentity>();
+      WHERE role = 'judge' AND (username IN ('judge1', 'judge2', 'judge3', 'judge4', 'judge5', 'ai-judge') OR id = 'user-judge4')
+    `).all<JudgeIdentity>();
     const judgeByUsername = new Map((judgeRows || []).map((judge) => [judge.username, judge]));
     const humanJudges = ["judge1", "judge2", "judge3"].map((username) => judgeByUsername.get(username));
     if (humanJudges.some((judge) => !judge)) {
@@ -99,7 +99,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
     const humanJudgeIdentities = humanJudges as JudgeIdentity[];
     const humanJudgeIds = humanJudgeIdentities.map((judge) => judge.id);
-    const judge4 = judgeByUsername.get("judge4");
+    const judge4 = judgeByUsername.get("ai-judge") || judgeByUsername.get("judge4") || (judgeRows || []).find((j) => j.id === "user-judge4");
     const judge5 = judgeByUsername.get("judge5");
 
     if (sessionUser && (sessionUser.role !== "judge" || !humanJudgeIds.includes(sessionUser.id))) {

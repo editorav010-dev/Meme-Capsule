@@ -355,15 +355,10 @@ const handleCron = async (request: Request, env: Env) => {
         now
       ).run();
 
-      // Create evaluations for Judge 4 and Judge 5
+      // Create evaluation placeholder for sole AI Judge (judge4)
       await env.DB.prepare(`
         INSERT INTO ingestion_ai_evaluations (id, job_id, meme_id, judge_key, state, created_at, updated_at)
         VALUES (?, ?, ?, 'judge4', 'pending', ?, ?)
-      `).bind(`eval-${crypto.randomUUID()}`, jobId, memeId, now, now).run();
-
-      await env.DB.prepare(`
-        INSERT INTO ingestion_ai_evaluations (id, job_id, meme_id, judge_key, state, created_at, updated_at)
-        VALUES (?, ?, ?, 'judge5', 'pending', ?, ?)
       `).bind(`eval-${crypto.randomUUID()}`, jobId, memeId, now, now).run();
 
       // Create private draft meme in D1

@@ -45,25 +45,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "meme_id is required" }, { status: 400 });
     }
 
-    // Determine judge identity
-    let judgeKey: "judge4" | "judge5";
+    // Determine judge identity (Judge 5 is retired; user-judge4 is the sole AI Judge)
+    let judgeKey: "judge4";
     let userId: string;
     let userName: string;
 
-    if (sessionUser.id === "user-judge4" || payload.judge_key === "judge4") {
+    if (sessionUser.id === "user-judge5" || payload.judge_key === "judge5") {
+      return json({ error: "Judge 5 is retired. Only AI Judge or SuperAdmin may submit advisory evaluations." }, { status: 403 });
+    }
+
+    if (sessionUser.id === "user-judge4" || sessionUser.username === "ai-judge" || sessionUser.username === "judge4" || payload.judge_key === "judge4") {
       judgeKey = "judge4";
       userId = "user-judge4";
-      userName = "Judge Four";
-    } else if (sessionUser.id === "user-judge5" || payload.judge_key === "judge5") {
-      judgeKey = "judge5";
-      userId = "user-judge5";
-      userName = "Judge Five";
+      userName = "AI Judge";
     } else if (sessionUser.role === "superadmin") {
-      judgeKey = payload.judge_key || "judge4";
-      userId = judgeKey === "judge5" ? "user-judge5" : "user-judge4";
-      userName = judgeKey === "judge5" ? "Judge Five" : "Judge Four";
+      judgeKey = "judge4";
+      userId = "user-judge4";
+      userName = "AI Judge";
     } else {
-      return json({ error: "Only Judge 4, Judge 5, or SuperAdmin may submit advisory evaluations." }, { status: 403 });
+      return json({ error: "Only AI Judge or SuperAdmin may submit advisory evaluations." }, { status: 403 });
     }
 
     const now = new Date().toISOString();
@@ -195,9 +195,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
       const evaluations = evalRows.results || [];
       const hasJ4 = evaluations.some((e) => e.judge_key === "judge4" && e.state === "succeeded");
-      const hasJ5 = evaluations.some((e) => e.judge_key === "judge5" && e.state === "succeeded");
 
-      if (hasJ4 && hasJ5) {
+      if (hasJ4) {
         allAiCompleted = true;
 
         // Transition job state to 'human_ready'

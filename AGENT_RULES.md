@@ -15,7 +15,7 @@
 2. **Zero Schema Drift**: **NEVER** write or deploy edge queries selecting new or modified database columns without FIRST physically verifying the live D1 schema via `PRAGMA table_info(<table>)` or applying migration files. Presumptive column querying was the cause of the October 2026 500 error outage and is strictly prohibited.
 3. **Multi-Judge Role Division**:
    - **Human Judges (Judges 1, 2, 3)**: Exclusively govern consensus (unanimous keep, unanimous exclude, duplicate agreement, split/conflicts) and SuperAdmin arbitration.
-   - **AI Judges (Judges 4 and 5)**: Provide assistive pre-evaluations to improve human efficiency. **AI judges MUST NEVER push conflicts, arguments, or blockers onto the SuperAdmin console, nor trigger arbitration states.**
+   - **AI Judge (i-judge / user-judge4)**: Provides assistive pre-evaluations to improve human efficiency. **AI Judge MUST NEVER push conflicts, arguments, or blockers onto the SuperAdmin console, nor trigger arbitration states.** Judge 5 is retired.
    - **Full Dashboard Visibility**: All 5 configured judges (3 Human + 2 AI) must always be displayed in the SuperAdmin live progress strip and in comparison matrices.
    - **Mandatory Exclude & Force-Remove Audit**: Every judge's "Exclude" votes and "Force Remove" purges must be explicitly counted and visibly rendered on the SuperAdmin dashboard.
 4. **Do Not Fix What Is Not Broken**: Never refactor working components, remove existing functionality, or change architectures without explicit user consent.

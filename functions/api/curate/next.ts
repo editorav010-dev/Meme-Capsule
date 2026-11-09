@@ -161,8 +161,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     const sessionUser = await validateSession(request, env);
     const userId = sessionUser?.id || "user-judge1";
-    const isAiJudge = userId === "user-judge4" || userId === "user-judge5";
-    const judgeKey = userId === "user-judge5" ? "judge5" : "judge4";
+    const isAiJudge = userId === "user-judge4" || sessionUser?.username === "ai-judge" || sessionUser?.username === "judge4";
+    const judgeKey = "judge4";
 
     const ingestionReady = await hasIngestionSchema(env.DB);
     const intakeJoin = ingestionReady ? "LEFT JOIN ingestion_jobs ij ON m.id = ij.meme_id" : "";

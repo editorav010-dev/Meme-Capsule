@@ -69,8 +69,8 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
         ('user-judge1',     'judge1',     'Judge One',    '${DEFAULT_PASS_HASH}', 'judge',      1),
         ('user-judge2',     'judge2',     'Judge Two',    '${DEFAULT_PASS_HASH}', 'judge',      1),
         ('user-judge3',     'judge3',     'Judge Three',  '${DEFAULT_PASS_HASH}', 'judge',      1),
-        ('user-judge4',     'judge4',     'Judge Four',   '${DEFAULT_PASS_HASH}', 'judge',      1),
-        ('user-judge5',     'judge5',     'Judge Five',   '${DEFAULT_PASS_HASH}', 'judge',      1);
+        ('user-judge4',     'ai-judge',   'AI Judge',     '${DEFAULT_PASS_HASH}', 'judge',      1),
+        ('user-judge5',     'judge5',     'Judge Five',   '${DEFAULT_PASS_HASH}', 'judge',      0);
 
       -- 4. Multi-User Meme Curation Table
       CREATE TABLE IF NOT EXISTS meme_curation (
@@ -157,6 +157,13 @@ export async function ensureCurationTables(db: D1Database): Promise<void> {
       await db.prepare("ALTER TABLE cat_users ADD COLUMN api_password_hash TEXT").run();
     } catch {
       // ignore if already exists
+    }
+
+    try {
+      await db.prepare("UPDATE cat_users SET username = 'ai-judge', display_name = 'AI Judge' WHERE id = 'user-judge4'").run();
+      await db.prepare("UPDATE cat_users SET is_active = 0 WHERE id = 'user-judge5'").run();
+    } catch {
+      // ignore
     }
 
     tablesInitialized = true;
