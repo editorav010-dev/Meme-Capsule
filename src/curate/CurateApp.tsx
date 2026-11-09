@@ -7,7 +7,7 @@ import {
   type CorpusStatus,
   type CuratorUser
 } from "./curateTypes";
-import { fetchNextMeme, approveCuration, saveCuration, forceRemoveMeme, updateMemeNsfw, setMemeNsfw } from "./curateApi";
+import { fetchNextMeme, approveCuration, saveCuration, forceRemoveMeme, updateMemeNsfw, setMemeNsfw, saveAdvisoryEvaluation, fetchCurateBatches, type CurateBatchItem } from "./curateApi";
 import EditorialButtons from "./EditorialButtons";
 import CategorizationPanel from "./CategorizationPanel";
 import CurationStatsModal from "./CurationStatsModal";
@@ -60,9 +60,14 @@ export default function CurateApp() {
     }
   });
 
+  const isAiJudge = user?.id === "user-judge4" || user?.id === "user-judge5";
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [batches, setBatches] = useState<CurateBatchItem[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState<boolean>(false);
+
   const [currentMeme, setCurrentMeme] = useState<CurateMemeItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [filterQueue, setFilterQueue] = useState<string>("unreviewed");
+  const [filterQueue, setFilterQueue] = useState<string>(() => (user?.id === "user-judge4" || user?.id === "user-judge5" ? "draft" : "unreviewed"));
   const [stats, setStats] = useState({ total: 4485, reviewed: 0, remaining: 4485, current_index: 1 });
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
   const [showAccountModal, setShowAccountModal] = useState<boolean>(false);
@@ -101,6 +106,30 @@ export default function CurateApp() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (isAiJudge && filterQueue === "unreviewed") {
+      setFilterQueue("draft");
+    }
+  }, [isAiJudge, filterQueue]);
+
+  useEffect(() => {
+    if (isAiJudge && token) {
+      setLoadingBatches(true);
+      fetchCurateBatches()
+        .then((res) => {
+          if (res.batches) {
+            setBatches(res.batches);
+            if (res.batches.length > 0 && !selectedBatchId) {
+              setSelectedBatchId(res.batches[0].id);
+            }
+          }
+        })
+        .catch((err) => console.error("Error loading curation batches:", err))
+        .finally(() => setLoadingBatches(false));
+    }
+  }, [isAiJudge, token]);
+
+
   // AI Judge State & Hook
   const [aiConfig, setAiConfig] = useState<AiJudgeConfig>(DEFAULT_AI_JUDGE_CONFIG);
 
@@ -116,16 +145,16 @@ export default function CurateApp() {
     setNote(noteText);
   }, []);
 
-  // Ref to decouple AI loop from human approval voting (prevents AI from writing human ballots)
-  const aiAdvanceRef = useRef<() => Promise<CurateMemeItem | null>>(async () => null);
+  // Ref to decouple AI loop from human approval voting and persist advisory decisions to D1
+  const aiAdvanceRef = useRef<(decision?: any) => Promise<CurateMemeItem | null>>(async () => null);
 
   const aiLoop = useAiJudgeLoop({
     currentMeme,
     config: aiConfig,
     onApplyDecision: handleApplyAiDecision,
-    onAdvance: async () => {
-      // Bug 1 fix: AI loop is strictly advisory and NEVER calls handleApproveAndAdvance or approveCuration.
-      return aiAdvanceRef.current();
+    onAdvance: async (decision) => {
+      // Passes AI decision to aiAdvanceRef to atomically persist to D1 before advancing
+      return aiAdvanceRef.current(decision);
     }
   });
 
@@ -271,8 +300,9 @@ export default function CurateApp() {
     try {
       const queue = prefetchQueueRef.current;
       const targetId = tailId || (queue.length > 0 ? queue[queue.length - 1].id : stateRef.current.currentMeme?.id);
+      const activeBatchId = filterQueue === "batch" ? selectedBatchId : undefined;
 
-      const res = await fetchNextMeme(filterQueue, targetId, "next", false, 4);
+      const res = await fetchNextMeme(filterQueue, targetId, "next", false, 4, activeBatchId);
       const incoming = (res.memes && res.memes.length > 0) ? res.memes : (res.meme ? [res.meme] : []);
       
       const existingIds = new Set([
@@ -293,7 +323,7 @@ export default function CurateApp() {
     } finally {
       isPrefetchingRef.current = false;
     }
-  }, [token, filterQueue]);
+  }, [token, filterQueue, selectedBatchId]);
 
   const loadInitialMeme = useCallback(async () => {
     if (!token) return;
@@ -304,7 +334,8 @@ export default function CurateApp() {
       setHistoryIndex(-1);
       historyIndexRef.current = -1;
 
-      const res = await fetchNextMeme(filterQueue, undefined, "next", true, 4);
+      const activeBatchId = filterQueue === "batch" ? selectedBatchId : undefined;
+      const res = await fetchNextMeme(filterQueue, undefined, "next", true, 4, activeBatchId);
       if (res.stats) {
         setStats(res.stats);
       }
@@ -344,13 +375,13 @@ export default function CurateApp() {
     } finally {
       setLoading(false);
     }
-  }, [filterQueue, token, applyMemeToForm]);
+  }, [filterQueue, token, applyMemeToForm, selectedBatchId]);
 
   useEffect(() => {
     if (token && viewMode === "judge") {
       loadInitialMeme();
     }
-  }, [token, viewMode, filterQueue, loadInitialMeme]);
+  }, [token, viewMode, filterQueue, selectedBatchId, loadInitialMeme]);
 
   const handleNavigatePrev = useCallback(() => {
     const currIdx = historyIndexRef.current;
@@ -407,7 +438,8 @@ export default function CurateApp() {
       setLoading(true);
       try {
         const currentId = stateRef.current.currentMeme?.id;
-        const res = await fetchNextMeme(filterQueue, currentId, "next", false, 4);
+        const activeBatchId = filterQueue === "batch" ? selectedBatchId : undefined;
+        const res = await fetchNextMeme(filterQueue, currentId, "next", false, 4, activeBatchId);
         const incoming = (res.memes && res.memes.length > 0) ? res.memes : (res.meme ? [res.meme] : []);
         if (incoming.length > 0) {
           const nextMeme = incoming[0];
@@ -441,10 +473,37 @@ export default function CurateApp() {
         setLoading(false);
       }
     }
-  }, [applyMemeToForm, filterQueue, refillPrefetchQueue]);
+  }, [applyMemeToForm, filterQueue, selectedBatchId, refillPrefetchQueue]);
 
-  // Bug 1 fix: Dedicated advisory advance handler that never casts human votes
-  const handleAiAdvisoryAdvance = useCallback(async (): Promise<CurateMemeItem | null> => {
+  // Dedicated advisory advance handler: atomically persists AI decisions to D1 and advances
+  const handleAiAdvisoryAdvance = useCallback(async (decision?: any): Promise<CurateMemeItem | null> => {
+    const memeToSave = stateRef.current.currentMeme;
+    if (decision && memeToSave && isAiJudge) {
+      try {
+        await saveAdvisoryEvaluation({
+          meme_id: memeToSave.id,
+          corpus_status: decision.corpus_status,
+          duplicate_of: decision.duplicate_of || null,
+          topics: decision.topics || [],
+          tone: decision.tone || null,
+          humour_mechanisms: decision.humour_mechanisms || [],
+          curator_note: decision.curator_note || null,
+          confidence: decision.confidence,
+          model: decision.modelUsed,
+          latency_ms: decision.latencyMs,
+          judge_key: user?.id === "user-judge5" ? "judge5" : "judge4"
+        });
+        setStats((prev) => ({
+          ...prev,
+          reviewed: prev.reviewed + 1,
+          remaining: Math.max(0, prev.remaining - 1)
+        }));
+      } catch (saveErr) {
+        console.error("Failed to save advisory evaluation:", saveErr);
+      }
+    }
+
+    const activeBatchId = filterQueue === "batch" ? selectedBatchId : undefined;
     const currIdx = historyIndexRef.current;
     setReCuratingMemeId(null);
     if (currIdx < historyStackRef.current.length - 1) {
@@ -485,7 +544,7 @@ export default function CurateApp() {
       setLoading(true);
       try {
         const currentId = stateRef.current.currentMeme?.id;
-        const res = await fetchNextMeme(filterQueue, currentId, "next", false, 4);
+        const res = await fetchNextMeme(filterQueue, currentId, "next", false, 4, activeBatchId);
         const incoming = (res.memes && res.memes.length > 0) ? res.memes : (res.meme ? [res.meme] : []);
         if (incoming.length > 0) {
           const nextMeme = incoming[0];
@@ -521,7 +580,7 @@ export default function CurateApp() {
         setLoading(false);
       }
     }
-  }, [applyMemeToForm, filterQueue, refillPrefetchQueue]);
+  }, [applyMemeToForm, filterQueue, isAiJudge, refillPrefetchQueue, selectedBatchId, user?.id]);
 
   useEffect(() => {
     aiAdvanceRef.current = handleAiAdvisoryAdvance;
@@ -676,7 +735,8 @@ export default function CurateApp() {
     } else {
       setLoading(true);
       try {
-        const res = await fetchNextMeme(filterQueue, currentMemeId, "next", false, 4);
+        const activeBatchId = filterQueue === "batch" ? selectedBatchId : undefined;
+        const res = await fetchNextMeme(filterQueue, currentMemeId, "next", false, 4, activeBatchId);
         const incoming = (res.memes && res.memes.length > 0) ? res.memes : (res.meme ? [res.meme] : []);
         if (incoming.length > 0) {
           nextMeme = incoming[0];
@@ -712,7 +772,7 @@ export default function CurateApp() {
     }
 
     return nextMeme;
-  }, [user, applyMemeToForm, filterQueue, refillPrefetchQueue]);
+  }, [user, applyMemeToForm, filterQueue, selectedBatchId, refillPrefetchQueue]);
 
   // Mobile Touch Gesture Actions
   const handleSwipeRight = useCallback(async () => {
@@ -1302,34 +1362,95 @@ export default function CurateApp() {
                 MEME CAPSULE CURATOR
               </span>
               <span style={{ fontSize: "11px", background: "#262626", padding: "3px 8px", borderRadius: "2px", color: "#f4c300", fontFamily: "monospace" }}>
-                {stats.reviewed} / {stats.total} REVIEWED ({percentComplete}%)
+                {isAiJudge ? `${stats.reviewed} / ${stats.total} EVALUATED (${percentComplete}%)` : `${stats.reviewed} / ${stats.total} REVIEWED (${percentComplete}%)`}
               </span>
             </div>
 
             {/* Center: Queue Selector & Refresh */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "11px", color: "#888" }}>QUEUE:</span>
-              <select
-                value={filterQueue}
-                onChange={(e) => setFilterQueue(e.target.value)}
-                style={{
-                  background: "#262626",
-                  border: "1px solid #9b30ff",
-                  color: "#f4c300",
-                  padding: "4px 10px",
-                  fontFamily: "Oswald",
-                  fontSize: "12px",
-                  outline: "none",
-                  cursor: "pointer"
-                }}
-              >
-                <option value="unreviewed">Unreviewed Memes</option>
-                <option value="review_later">⚠️ Review Later Queue</option>
-                <option value="keep">✓ Kept Active Memes</option>
-                <option value="excluded">✕ Excluded Memes</option>
-                <option value="duplicate">⎘ Duplicates</option>
-                <option value="all">All Corpus</option>
-              </select>
+              {isAiJudge ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <select
+                    value={filterQueue}
+                    onChange={(e) => {
+                      const nextQ = e.target.value;
+                      setFilterQueue(nextQ);
+                      if (nextQ === "batch" && batches.length > 0 && !selectedBatchId) {
+                        setSelectedBatchId(batches[0].id);
+                      }
+                    }}
+                    style={{
+                      background: "#1c1b1b",
+                      border: "1px solid #00f0ff",
+                      color: "#00f0ff",
+                      padding: "4px 10px",
+                      fontFamily: "Oswald",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="draft">⚡ Draft Queue (All Unreviewed)</option>
+                    <option value="batch">📦 Batches Queue</option>
+                  </select>
+
+                  {filterQueue === "batch" && (
+                    <select
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(e.target.value)}
+                      style={{
+                        background: "#1c1b1b",
+                        border: "1px solid #ffe600",
+                        color: "#ffe600",
+                        padding: "4px 8px",
+                        fontFamily: "monospace",
+                        fontSize: "11px",
+                        maxWidth: "280px",
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {batches.length === 0 ? (
+                        <option value="">No Ingestion Batches</option>
+                      ) : (
+                        batches.map((b) => {
+                          const judgeProg = user?.id === "user-judge5" ? b.judge5 : b.judge4;
+                          const shortId = b.id.replace(/^batch-/, "").slice(0, 8);
+                          return (
+                            <option key={b.id} value={b.id}>
+                              [{shortId}..] {judgeProg?.completed || 0}/{b.valid_drafts} ({b.percent_complete}%)
+                            </option>
+                          );
+                        })
+                      )}
+                    </select>
+                  )}
+                </div>
+              ) : (
+                <select
+                  value={filterQueue}
+                  onChange={(e) => setFilterQueue(e.target.value)}
+                  style={{
+                    background: "#262626",
+                    border: "1px solid #9b30ff",
+                    color: "#f4c300",
+                    padding: "4px 10px",
+                    fontFamily: "Oswald",
+                    fontSize: "12px",
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  <option value="unreviewed">Unreviewed Memes</option>
+                  <option value="review_later">⚠️ Review Later Queue</option>
+                  <option value="keep">✓ Kept Active Memes</option>
+                  <option value="excluded">✕ Excluded Memes</option>
+                  <option value="duplicate">⎘ Duplicates</option>
+                  <option value="all">All Corpus</option>
+                </select>
+              )}
 
               <button
                 type="button"
@@ -1458,29 +1579,79 @@ export default function CurateApp() {
         <div className="curate-mobile-drawer">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
             <span style={{ fontSize: "12px", color: "#888", fontFamily: "Oswald" }}>QUEUE:</span>
-            <select
-              value={filterQueue}
-              onChange={(e) => {
-                setFilterQueue(e.target.value);
-                setShowMobileMenu(false);
-              }}
-              style={{
-                flex: 1,
-                background: "#262626",
-                border: "1px solid #9b30ff",
-                color: "#f4c300",
-                padding: "6px 8px",
-                fontFamily: "Oswald",
-                fontSize: "13px"
-              }}
-            >
-              <option value="unreviewed">Unreviewed Memes</option>
-              <option value="review_later">⚠️ Review Later Queue</option>
-              <option value="keep">✓ Kept Active Memes</option>
-              <option value="excluded">✕ Excluded Memes</option>
-              <option value="duplicate">⎘ Duplicates</option>
-              <option value="all">All Corpus</option>
-            </select>
+            {isAiJudge ? (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                <select
+                  value={filterQueue}
+                  onChange={(e) => {
+                    const nextQ = e.target.value;
+                    setFilterQueue(nextQ);
+                    if (nextQ === "batch" && batches.length > 0 && !selectedBatchId) {
+                      setSelectedBatchId(batches[0].id);
+                    }
+                    setShowMobileMenu(false);
+                  }}
+                  style={{
+                    background: "#1c1b1b",
+                    border: "1px solid #00f0ff",
+                    color: "#00f0ff",
+                    padding: "6px 8px",
+                    fontFamily: "Oswald",
+                    fontSize: "13px"
+                  }}
+                >
+                  <option value="draft">⚡ Draft Queue (All Unreviewed)</option>
+                  <option value="batch">📦 Batches Queue</option>
+                </select>
+                {filterQueue === "batch" && (
+                  <select
+                    value={selectedBatchId}
+                    onChange={(e) => {
+                      setSelectedBatchId(e.target.value);
+                      setShowMobileMenu(false);
+                    }}
+                    style={{
+                      background: "#1c1b1b",
+                      border: "1px solid #ffe600",
+                      color: "#ffe600",
+                      padding: "6px 8px",
+                      fontFamily: "monospace",
+                      fontSize: "11px"
+                    }}
+                  >
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        [{b.id.replace(/^batch-/, "").slice(0, 8)}..] {b.valid_drafts} items
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <select
+                value={filterQueue}
+                onChange={(e) => {
+                  setFilterQueue(e.target.value);
+                  setShowMobileMenu(false);
+                }}
+                style={{
+                  flex: 1,
+                  background: "#262626",
+                  border: "1px solid #9b30ff",
+                  color: "#f4c300",
+                  padding: "6px 8px",
+                  fontFamily: "Oswald",
+                  fontSize: "13px"
+                }}
+              >
+                <option value="unreviewed">Unreviewed Memes</option>
+                <option value="review_later">⚠️ Review Later Queue</option>
+                <option value="keep">✓ Kept Active Memes</option>
+                <option value="excluded">✕ Excluded Memes</option>
+                <option value="duplicate">⎘ Duplicates</option>
+                <option value="all">All Corpus</option>
+              </select>
+            )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
@@ -1593,6 +1764,8 @@ export default function CurateApp() {
               onAdopt={(j, src) => handleApproveAndAdvance(src, j.corpus_status, j)}
               onForceRemove={handleForceRemove}
               isMobile={true}
+              isAiJudge={isAiJudge}
+              judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
             />
           )}
 
@@ -1882,9 +2055,16 @@ export default function CurateApp() {
               ) : currentMeme ? (
                 <img
                   key={currentMeme.id}
-                  src={currentMeme.image_url}
+                  src={currentMeme.image_url || `/api/curate/media/proxy?id=${encodeURIComponent(currentMeme.id)}`}
                   alt={currentMeme.title}
                   className="curate-meme-img"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    const fallback = `/api/curate/media/proxy?id=${encodeURIComponent(currentMeme.id)}`;
+                    if (target.src !== fallback && !target.src.includes("/api/curate/media/proxy")) {
+                      target.src = fallback;
+                    }
+                  }}
                 />
               ) : (
                 <div style={{ textAlign: "center", color: "#888" }}>
@@ -2003,6 +2183,8 @@ export default function CurateApp() {
                 onEnterOverride={() => setOverrideMode(true)}
                 onAdopt={(j, src) => handleApproveAndAdvance(src, j.corpus_status, j)}
                 onForceRemove={handleForceRemove}
+                isAiJudge={isAiJudge}
+                judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
               />
             )}
 

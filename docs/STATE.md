@@ -485,6 +485,42 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
   - All test suites passing (`test:ingestion`, `test:vault`, `test:editor`, `test:analytics`).
   - Production build: `tsc && vite build` compiled 1,713 modules in 11.51s with zero errors.
 
+---
+
+## 17. AI Judge Queue System & Batch-Based Curation Workflow Rework (November 9, 2026)
+
+- **1. AI Judge Gating Bug Fix & Draft Queue Activation (`functions/api/curate/next.ts`)**:
+  - **The Root Cause**: The clause `AND (ij.meme_id IS NULL OR ij.state = 'human_ready')` was previously applied unconditionally to all users in `next.ts`. Because newly uploaded memes have `state = 'queued'`, all Draft memes were 100% invisible to Judge 4 and Judge 5. The queue fell back to legacy memes that lacked AI evaluation records, triggering `NO AI PRE-JUDGEMENT AVAILABLE`.
+  - **The Fix**: Added role-awareness to `next.ts`. When authenticated as an AI Judge (`user-judge4` or `user-judge5`), the endpoint queries eligible `Draft` memes (`memes.status = 'draft' AND memes.is_active = 0`) joined with `ingestion_jobs` (`upload_state = 'uploaded'`) and `ingestion_ai_evaluations` where this judge's evaluation state is not `succeeded`. For human judges, the exact existing 6 editorial queues and gating rules are preserved.
+  - **Universal Media Proxy Fallback**: Added direct fallback to `/api/curate/media/proxy?id=${meme.id}` for all curation responses and image elements, guaranteeing reliable media rendering even when public bucket URLs are unconfigured or restricted.
+
+- **2. Dedicated AI Advisory Persistence Endpoint (`functions/api/curate/advisory-save.ts`)**:
+  - Created `POST /api/curate/advisory-save` specifically for Judge 4 and Judge 5.
+  - Atomically updates `ingestion_ai_evaluations` with `state = 'succeeded'`, model, decision, topics, tone, humour mechanisms, and confidence.
+  - Mirrors the decision to `meme_curation` for complete audit transparency and multi-judge visibility.
+  - When **both** Judge 4 and Judge 5 evaluations reach `succeeded`:
+    1. Promotes `ingestion_jobs.state = 'human_ready'`.
+    2. Promotes `memes.status = 'archived'` (`is_active = 0`, awaiting human review).
+    3. Populates `ai_curation_predictions` for human judge advisory badge display.
+    4. Automatically invokes `refreshBatchStatus` in D1.
+
+- **3. Live Batch Discovery & Telemetry (`functions/api/curate/batches.ts`)**:
+  - Created `GET /api/curate/batches` accessible to judges and administrators.
+  - Aggregates active batches, total items, valid drafts, Judge 4 completed/remaining, Judge 5 completed/remaining, both completed, and overall completion percentages using indexed joins with zero full-table scans.
+
+- **4. Two-Queue Model in Frontend Console (`src/curate/CurateApp.tsx`, `AiReviewPanel.tsx`)**:
+  - **Role-Aware Queue Selector**: When logged in as Judge 4 or Judge 5, the UI displays `⚡ Draft Queue (All Unreviewed)` and `📦 Batches Queue` with a live batch picker dropdown showing batch ID, date, and completion metrics. Human judges strictly retain the 6 editorial queues.
+  - **Durable AI Loop Persistence**: Connected `useAiJudgeLoop.ts` and `handleAiAdvisoryAdvance` to call `POST /api/curate/advisory-save`, ensuring continuous AI evaluations in the browser runner are durably saved to D1 on every card advance.
+  - **Informative AI Panel State**: Updated `AiReviewPanel.tsx` so uncurated draft memes display `⚡ DRAFT MEME — AWAITING AI EVALUATION` with runner prompts rather than the misleading `NO AI PRE-JUDGEMENT AVAILABLE`.
+
+- **5. Verification & Automated Tests**:
+  - Added `tests/aiJudgeQueues.test.ts` verifying draft eligibility, dual-AI completion promotion, and media proxy fallbacks.
+  - All test suites passing:
+    - Vitest: 5 test files, 25 tests passing (`aiJudgeQueues`, `bulkIngestion`, `editor`, `vault`, `analytics`).
+    - Node test runner: 9 consensus tests passing (`curationConsensus`).
+  - Production build: `tsc && vite build` compiled 1,718 modules cleanly in 16.63s with zero errors.
+
+
 
 
 

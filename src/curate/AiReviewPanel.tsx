@@ -7,6 +7,8 @@ interface AiReviewPanelProps {
   onAdopt: (j: CuratedMemeData, source: "judge4" | "judge5" | "consensus") => void;
   onForceRemove: () => void;
   isMobile?: boolean;
+  isAiJudge?: boolean;
+  judgeName?: string;
 }
 
 export default function AiReviewPanel({
@@ -15,7 +17,9 @@ export default function AiReviewPanel({
   onEnterOverride,
   onAdopt,
   onForceRemove,
-  isMobile = false
+  isMobile = false,
+  isAiJudge = false,
+  judgeName = "AI Judge"
 }: AiReviewPanelProps) {
   const hasJ4 = Boolean(j4?.corpus_status);
   const hasJ5 = Boolean(j5?.corpus_status);
@@ -261,16 +265,16 @@ export default function AiReviewPanel({
           <div
             className="curate-mobile-ai-card"
             style={{
-              borderColor: "#555",
+              borderColor: isAiJudge ? "#00f0ff" : "#555",
               textAlign: "center",
               padding: "10px 14px"
             }}
           >
-            <div style={{ color: "#f4c300", fontFamily: "Anton", fontSize: "14px" }}>
-              NO AI PRE-JUDGEMENT
+            <div style={{ color: isAiJudge ? "#00f0ff" : "#f4c300", fontFamily: "Anton", fontSize: "14px" }}>
+              {isAiJudge ? "⚡ DRAFT READY FOR AI" : "NO AI PRE-JUDGEMENT"}
             </div>
             <div style={{ fontSize: "11px", color: "#888", margin: "4px 0" }}>
-              Swipe up (↑) or tap to curate manually
+              {isAiJudge ? `Awaiting evaluation by ${judgeName}` : "Swipe up (↑) or tap to curate manually"}
             </div>
             <button
               type="button"
@@ -484,16 +488,18 @@ export default function AiReviewPanel({
         <div
           style={{
             background: "#1c1b1b",
-            border: "2px solid #555",
+            border: isAiJudge ? "2px solid #00f0ff" : "2px solid #555",
             padding: "20px",
             textAlign: "center"
           }}
         >
-          <div style={{ fontSize: "18px", color: "#f4c300", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "8px" }}>
-            NO AI PRE-JUDGEMENT AVAILABLE
+          <div style={{ fontSize: "18px", color: isAiJudge ? "#00f0ff" : "#f4c300", fontFamily: "Anton", letterSpacing: "1px", marginBottom: "8px" }}>
+            {isAiJudge ? "⚡ DRAFT MEME — AWAITING AI EVALUATION" : "NO AI PRE-JUDGEMENT AVAILABLE"}
           </div>
           <p style={{ color: "#aaa", fontSize: "13px", margin: "0 0 16px 0" }}>
-            This meme has not been pre-evaluated by AI Judge 4 or Judge 5. Please curate manually.
+            {isAiJudge
+              ? `This meme is queued for ${judgeName}. Start Continuous AI Judge above or click manual curation below.`
+              : "This meme has not been pre-evaluated by AI Judge 4 or Judge 5. Please curate manually."}
           </p>
           <button
             type="button"

@@ -29,7 +29,8 @@ export async function fetchNextMeme(
   currentId?: string,
   direction: "next" | "prev" = "next",
   includeStats: boolean = false,
-  limit?: number
+  limit?: number,
+  batchId?: string
 ): Promise<{
   meme: CurateMemeItem | null;
   memes?: CurateMemeItem[];
@@ -37,6 +38,7 @@ export async function fetchNextMeme(
 }> {
   const query = new URLSearchParams();
   if (filter) query.set("filter", filter);
+  if (batchId) query.set("batch_id", batchId);
   if (currentId) query.set("current_id", currentId);
   if (direction) query.set("direction", direction);
   if (includeStats) query.set("include_stats", "true");
@@ -45,6 +47,49 @@ export async function fetchNextMeme(
   const res = await fetch(`/api/curate/next?${query.toString()}`, {
     headers: getAuthHeaders(),
     cache: "no-store"
+  });
+  return handleResponse(res);
+}
+
+export interface CurateBatchItem {
+  id: string;
+  status: string;
+  created_at: string;
+  total_items: number;
+  total_bytes: number;
+  valid_drafts: number;
+  failed_uploads: number;
+  judge4: { completed: number; remaining: number };
+  judge5: { completed: number; remaining: number };
+  both_completed: number;
+  percent_complete: number;
+}
+
+export async function fetchCurateBatches(): Promise<{ batches: CurateBatchItem[] }> {
+  const res = await fetch("/api/curate/batches", {
+    headers: getAuthHeaders(),
+    cache: "no-store"
+  });
+  return handleResponse(res);
+}
+
+export async function saveAdvisoryEvaluation(payload: {
+  meme_id: string;
+  corpus_status: CorpusStatus;
+  duplicate_of?: string | null;
+  topics?: string[];
+  tone?: string | null;
+  humour_mechanisms?: string[];
+  curator_note?: string | null;
+  confidence?: number;
+  model?: string;
+  latency_ms?: number;
+  judge_key?: "judge4" | "judge5";
+}): Promise<{ success: boolean; meme_id: string; judge_key: string; all_ai_completed: boolean }> {
+  const res = await fetch("/api/curate/advisory-save", {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload)
   });
   return handleResponse(res);
 }
