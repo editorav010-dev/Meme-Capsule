@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import type { CuratedMemeData } from "./curateTypes";
 
 interface AiReviewPanelProps {
@@ -9,6 +10,9 @@ interface AiReviewPanelProps {
   isMobile?: boolean;
   isAiJudge?: boolean;
   judgeName?: string;
+  onTestEvaluate?: () => void;
+  isTesting?: boolean;
+  activeModel?: string;
 }
 
 export default function AiReviewPanel({
@@ -19,8 +23,12 @@ export default function AiReviewPanel({
   onForceRemove,
   isMobile = false,
   isAiJudge = false,
-  judgeName = "AI Judge"
+  judgeName = "AI Judge",
+  onTestEvaluate,
+  isTesting = false,
+  activeModel = "Vision Model"
 }: AiReviewPanelProps) {
+  const [showContract, setShowContract] = useState(false);
   const hasJ4 = Boolean(j4?.corpus_status);
   const hasJ5 = Boolean(j5?.corpus_status);
 
@@ -276,22 +284,58 @@ export default function AiReviewPanel({
             <div style={{ fontSize: "11px", color: "#888", margin: "4px 0" }}>
               {isAiJudge ? `Awaiting evaluation by ${judgeName}` : "Swipe up (↑) or tap to curate manually"}
             </div>
-            <button
-              type="button"
-              onClick={onEnterOverride}
-              style={{
-                background: "#9b30ff",
-                color: "#fff",
-                border: "none",
-                padding: "6px 14px",
-                fontFamily: "Anton",
-                fontSize: "12px",
-                cursor: "pointer",
-                marginTop: "4px"
-              }}
-            >
-              ✏️ OPEN MANUAL OVERRIDE
-            </button>
+            {isAiJudge ? (
+              <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                <button
+                  type="button"
+                  onClick={onTestEvaluate}
+                  disabled={isTesting}
+                  style={{
+                    flex: 1,
+                    background: isTesting ? "#555" : "#00f0ff",
+                    color: "#000",
+                    border: "none",
+                    padding: "8px",
+                    fontFamily: "Anton",
+                    fontSize: "12px",
+                    cursor: isTesting ? "wait" : "pointer"
+                  }}
+                >
+                  {isTesting ? "⚡ EVALUATING..." : "⚡ TEST EVALUATE (AI)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onEnterOverride}
+                  style={{
+                    background: "#222",
+                    color: "#aaa",
+                    border: "1px solid #444",
+                    padding: "6px 10px",
+                    fontSize: "11px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Override
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onEnterOverride}
+                style={{
+                  background: "#9b30ff",
+                  color: "#fff",
+                  border: "none",
+                  padding: "6px 14px",
+                  fontFamily: "Anton",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  marginTop: "4px"
+                }}
+              >
+                ✏️ OPEN MANUAL OVERRIDE
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -498,53 +542,147 @@ export default function AiReviewPanel({
           </div>
           <p style={{ color: "#aaa", fontSize: "13px", margin: "0 0 16px 0" }}>
             {isAiJudge
-              ? `This meme is queued for ${judgeName}. Start Continuous AI Judge above or click manual curation below.`
+              ? `This meme is queued for ${judgeName}. Run continuous batch above or test evaluate this individual meme.`
               : "This meme has not been pre-evaluated by AI Judge 4 or Judge 5. Please curate manually."}
           </p>
-          <button
-            type="button"
-            onClick={onEnterOverride}
-            style={{
-              background: "#9b30ff",
-              color: "#ffffff",
-              border: "2px solid #f4c300",
-              padding: "10px 20px",
-              fontFamily: "Anton",
-              fontSize: "16px",
-              cursor: "pointer",
-              boxShadow: "3px 3px 0px #f4c300"
-            }}
-          >
-            OPEN MANUAL CURATION [O]
-          </button>
+
+          {isAiJudge ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "340px", margin: "0 auto" }}>
+              <button
+                type="button"
+                onClick={onTestEvaluate}
+                disabled={isTesting}
+                style={{
+                  background: isTesting ? "#555" : "#00f0ff",
+                  color: "#000",
+                  border: "2px solid #fff",
+                  padding: "12px 20px",
+                  fontFamily: "Anton",
+                  fontSize: "16px",
+                  cursor: isTesting ? "wait" : "pointer",
+                  boxShadow: "3px 3px 0px #000",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
+                }}
+              >
+                {isTesting ? "⚡ EVALUATING WITH VISION AI..." : "⚡ TEST EVALUATE THIS MEME (AI)"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowContract((prev) => !prev)}
+                style={{
+                  background: "#242424",
+                  color: "#00f0ff",
+                  border: "1px solid #00f0ff",
+                  padding: "8px 12px",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  fontFamily: "monospace"
+                }}
+              >
+                {showContract ? "▼ HIDE AI PROMPT CONTRACT" : "▶ INSPECT AI PROMPT CONTRACT"}
+              </button>
+
+              {showContract && (
+                <div style={{ background: "#121212", border: "1px solid #333", padding: "12px", textAlign: "left", fontSize: "11px", color: "#ccc", lineHeight: "1.5" }}>
+                  <div style={{ color: "#00f0ff", fontWeight: "bold", marginBottom: "4px" }}>📋 AI EVALUATION CONTRACT</div>
+                  <div>• <strong>Output Schema:</strong> JSON {`{ corpus_status, topics, tone, humour_mechanisms, curator_note, confidence }`}</div>
+                  <div>• <strong>Editorial Actions:</strong> keep | excluded | duplicate | review_later</div>
+                  <div>• <strong>Quality Filter:</strong> Exclude aggregator watermarks (9GAG, iFunny, TikTok stamps). Preserve authentic meme captions.</div>
+                  <div>• <strong>Active Model:</strong> {activeModel}</div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={onEnterOverride}
+                style={{
+                  background: "#181818",
+                  color: "#888",
+                  border: "1px dashed #444",
+                  padding: "8px 14px",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  marginTop: "6px"
+                }}
+              >
+                🛠 Curator Emergency Override [Shift + O]
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onEnterOverride}
+              style={{
+                background: "#9b30ff",
+                color: "#ffffff",
+                border: "2px solid #f4c300",
+                padding: "10px 20px",
+                fontFamily: "Anton",
+                fontSize: "16px",
+                cursor: "pointer",
+                boxShadow: "3px 3px 0px #f4c300"
+              }}
+            >
+              OPEN MANUAL CURATION [O]
+            </button>
+          )}
         </div>
       )}
 
       {/* Action Buttons Row: Manual Override & FORCE REMOVE */}
       <div style={{ display: "flex", gap: "12px", marginTop: "4px" }}>
-        <button
-          type="button"
-          onClick={onEnterOverride}
-          style={{
-            flex: 1,
-            background: "#222222",
-            color: "#f4c300",
-            border: "1px solid #f4c300",
-            padding: "12px",
-            fontFamily: "Anton",
-            fontSize: "15px",
-            cursor: "pointer",
-            boxShadow: "2px 2px 0px #f4c300",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px"
-          }}
-          title="Switch to manual curation [Key: O]"
-        >
-          <span>✏️</span>
-          <span>MANUAL OVERRIDE [O]</span>
-        </button>
+        {isAiJudge ? (
+          <button
+            type="button"
+            onClick={onTestEvaluate}
+            disabled={isTesting}
+            style={{
+              flex: 1,
+              background: "#1c2e36",
+              color: "#00f0ff",
+              border: "1px solid #00f0ff",
+              padding: "12px",
+              fontFamily: "Anton",
+              fontSize: "15px",
+              cursor: isTesting ? "wait" : "pointer",
+              boxShadow: "2px 2px 0px #00f0ff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+          >
+            <span>⚡</span>
+            <span>{isTesting ? "EVALUATING..." : "AI EVALUATE [ENTER]"}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onEnterOverride}
+            style={{
+              flex: 1,
+              background: "#222222",
+              color: "#f4c300",
+              border: "1px solid #f4c300",
+              padding: "12px",
+              fontFamily: "Anton",
+              fontSize: "15px",
+              cursor: "pointer",
+              boxShadow: "2px 2px 0px #f4c300",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+          >
+            <span>✏️</span>
+            <span>MANUAL OVERRIDE [O]</span>
+          </button>
+        )}
 
         <button
           type="button"

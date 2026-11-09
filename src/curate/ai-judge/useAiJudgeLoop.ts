@@ -36,6 +36,8 @@ export function useAiJudgeLoop({
   const inFlightMemeIdRef = useRef<string | null>(null);
   const processedCountRef = useRef(0);
   const consecutiveFailuresRef = useRef(0);
+  const fatalConsecutiveFailuresRef = useRef(0);
+  const transientConsecutiveFailuresRef = useRef(0);
 
   useEffect(() => {
     currentMemeRef.current = currentMeme;
@@ -94,13 +96,16 @@ export function useAiJudgeLoop({
     let attempt = 0;
     let decision: AiJudgeDecision | null = null;
     let lastError: unknown = null;
+    let isFatal = false;
 
-    // Fast retry loop with jitter for transient recoverable errors
+    // Fast retry loop with jitter for transient recoverable errors only
     while (attempt < MAX_RETRIES && isRunningRef.current) {
       attempt += 1;
       try {
         decision = await analyzeMemeWithAi(meme, configRef.current);
-        // Successful analysis!
+        // Successful analysis! Reset consecutive failure circuit breakers
+        fatalConsecutiveFailuresRef.current = 0;
+        transientConsecutiveFailuresRef.current = 0;
         consecutiveFailuresRef.current = 0;
         if (attempt > 1) {
           setRecoveredCount((prev) => prev + 1);
@@ -111,19 +116,23 @@ export function useAiJudgeLoop({
         const errText = err instanceof Error ? err.message : String(err);
         const errLower = errText.toLowerCase();
 
-        // Non-recoverable failures (Auth errors, missing key, DB quota limits)
-        const isAuthError =
+        // 1. Check for fatal configuration / authentication / model retirement errors
+        isFatal =
+          errLower.includes("410") ||
+          errLower.includes("gone") ||
+          errLower.includes("model retired") ||
           errLower.includes("401") ||
           errLower.includes("unauthorized") ||
           errLower.includes("403") ||
           errLower.includes("forbidden") ||
-          errLower.includes("invalid api key");
+          errLower.includes("404") ||
+          errLower.includes("not found") ||
+          errLower.includes("invalid api key") ||
+          errLower.includes("does not support image inputs");
 
-        if (isAuthError) {
-          isProcessingRef.current = false;
-          setErrorMessage(errText);
-          stop(`Authentication error: ${errText}`);
-          return;
+        // Fatal errors must fail fast with ZERO retries
+        if (isFatal) {
+          break;
         }
 
         const isQuotaError =
@@ -138,10 +147,10 @@ export function useAiJudgeLoop({
           return;
         }
 
-        // Recoverable failures: 429, 500, 502, 503, 504, timeout, network disconnect
+        // 2. Transient recoverable failures: 429, 500, 502, 503, 504, timeout, network glitch
         if (attempt < MAX_RETRIES && isRunningRef.current) {
           setLoopState("retrying");
-          const backoffMs = Math.min(3000, 1000 * attempt + Math.random() * 300);
+          const backoffMs = Math.min(3500, 1500 * attempt + Math.random() * 300);
           setStatusMessage(
             `🔄 Temporary glitch on ${meme.id} (${errText.slice(0, 45)}). Retrying ${attempt}/${MAX_RETRIES} in ${(backoffMs / 1000).toFixed(1)}s...`
           );
@@ -159,34 +168,69 @@ export function useAiJudgeLoop({
       return;
     }
 
-    // If retries exhausted, handle gracefully without halting entire batch
+    // Handle failure without fabricating false curation decisions
     if (!decision) {
-      consecutiveFailuresRef.current += 1;
       const finalErrText = lastError instanceof Error ? lastError.message : "AI Analysis failed";
       setErrorMessage(`Meme ${meme.id}: ${finalErrText}`);
+      setSkippedCount((prev) => prev + 1);
 
-      // Circuit breaker: pause if 5 consecutive different memes fail completely
-      if (consecutiveFailuresRef.current >= 5) {
-        isProcessingRef.current = false;
-        stop("Paused: 5 consecutive memes failed. Please check your provider quota, model name, or base URL.");
-        return;
+      // Async non-blocking log event
+      try {
+        void fetch("/api/admin/system-logs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workflow: "ai_curation",
+            severity: isFatal ? "fatal" : "error",
+            actor: configRef.current.activePresetId ? "ai_judge" : "browser_runner",
+            item_id: meme.id,
+            provider: configRef.current.provider,
+            model: configRef.current.model,
+            message: finalErrText.slice(0, 200),
+            details: { isFatal, attempt, meme_id: meme.id }
+          })
+        }).catch(() => undefined);
+      } catch {
+        // Logging failure must never crash curation loop
       }
 
-      // Safe fallback decision: Mark as review_later and keep continuous batch moving
-      decision = {
-        corpus_status: (configRef.current.lowConfidenceFallback || "review_later") as any,
-        duplicate_of: null,
-        topics: ["Everyday Life"],
-        tone: "Neutral",
-        humour_mechanisms: ["Relatability"],
-        curator_note: `[AI Error Recovery] Processing failed after ${MAX_RETRIES} attempts: ${finalErrText.slice(0, 100)}`,
-        confidence: 0.1,
-        modelUsed: configRef.current.model,
-        latencyMs: 0
-      };
+      // TWO-TIER CIRCUIT BREAKER:
+      if (isFatal) {
+        fatalConsecutiveFailuresRef.current += 1;
+        if (fatalConsecutiveFailuresRef.current >= 2) {
+          isProcessingRef.current = false;
+          stop(`Paused: Fatal provider error (${finalErrText.slice(0, 80)}). Model may be retired or credentials invalid. Please check Model Config.`);
+          return;
+        }
+      } else {
+        transientConsecutiveFailuresRef.current += 1;
+        if (transientConsecutiveFailuresRef.current >= 10) {
+          isProcessingRef.current = false;
+          stop("Paused: 10 consecutive memes failed due to network/provider errors. Runner paused safely.");
+          return;
+        }
+      }
 
-      setSkippedCount((prev) => prev + 1);
-      setStatusMessage(`⚠️ Meme ${meme.id} skipped after ${MAX_RETRIES} retries. Advancing...`);
+      // ADVANCE CLEANLY: Do NOT fabricate a fake review_later decision.
+      // Calling onAdvance(undefined) skips saving to D1 and simply loads the next eligible meme.
+      setStatusMessage(`⚠️ Meme ${meme.id} skipped due to error. Advancing to next draft...`);
+      setLoopState("saving");
+      let nextMeme: CurateMemeItem | null = null;
+      try {
+        nextMeme = await onAdvance(undefined);
+      } catch (advanceErr) {
+        console.error("Advance error on skipped meme:", advanceErr);
+      }
+
+      isProcessingRef.current = false;
+      if (!isRunningRef.current) return;
+
+      if (nextMeme && nextMeme.id !== meme.id) {
+        processMeme(nextMeme);
+      } else {
+        stop("Queue finished or no more unreviewed memes in this queue.");
+      }
+      return;
     }
 
     if (!isRunningRef.current) {
@@ -287,6 +331,8 @@ export function useAiJudgeLoop({
     isRunningRef.current = true;
     isProcessingRef.current = false;
     consecutiveFailuresRef.current = 0;
+    fatalConsecutiveFailuresRef.current = 0;
+    transientConsecutiveFailuresRef.current = 0;
     setIsRunning(true);
     setErrorMessage(null);
     processedCountRef.current = 0;

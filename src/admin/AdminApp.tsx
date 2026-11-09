@@ -30,6 +30,7 @@ import SqlRunner from "./sql-runner/SqlRunner";
 import PushNotifications from "./PushNotifications";
 import ScheduledNotifications from "./ScheduledNotifications";
 import BulkIngestionWorkspace from "./BulkIngestionWorkspace";
+import AutomationLogsTab from "./AutomationLogsTab";
 import {
   CURATION_TOPICS,
   CURATION_TONES,
@@ -184,7 +185,7 @@ export default function AdminApp() {
   const [backendConfig, setBackendConfig] = useState<{ hasR2PublicUrl?: boolean; hasDatabase?: boolean }>({});
   const [backendActiveCount, setBackendActiveCount] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeTab, setActiveTab] = useState<"vault" | "add" | "sql" | "notifications">("vault");
+  const [activeTab, setActiveTab] = useState<"vault" | "add" | "logs" | "sql" | "notifications">("vault");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -814,7 +815,7 @@ export default function AdminApp() {
     URL.revokeObjectURL(url);
   };
 
-  const selectAdminView = (view: "vault" | "add" | "sql" | "notifications") => {
+  const selectAdminView = (view: "vault" | "add" | "logs" | "sql" | "notifications") => {
     setActiveTab(view);
     setIsMobileNavOpen(false);
     if (view === "add") {
@@ -979,6 +980,12 @@ export default function AdminApp() {
               <h3 id="operations-nav-heading" className="nav-group-title">Operations</h3>
               <ul>
                 <li>
+                  <button type="button" className={activeTab === "logs" ? "active" : ""} onClick={() => selectAdminView("logs")} title="Notifications & Logs" aria-label="Notifications & Logs" aria-current={activeTab === "logs" ? "page" : undefined}>
+                    <span className="material-symbols-outlined" aria-hidden="true">monitor_heart</span>
+                    <span className="nav-label">Notifications & Logs</span>
+                  </button>
+                </li>
+                <li>
                   <button type="button" className={activeTab === "notifications" ? "active" : ""} onClick={() => selectAdminView("notifications")} title="Push Notifications" aria-label="Push Notifications" aria-current={activeTab === "notifications" ? "page" : undefined}>
                     <span className="material-symbols-outlined" aria-hidden="true">notifications</span>
                     <span className="nav-label">Push Notifications</span>
@@ -1101,6 +1108,10 @@ export default function AdminApp() {
               className="brutalist-border brutalist-shadow-black"
             >
               <SqlRunner adminToken={adminToken} />
+            </div>
+          ) : activeTab === "logs" ? (
+            <div className="brutalist-border brutalist-shadow-black" style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}>
+              <AutomationLogsTab adminToken={adminToken} />
             </div>
           ) : activeTab === "notifications" ? (
             <div className="brutalist-border brutalist-shadow-black" style={{ background: "var(--background)", flex: 1, minHeight: "600px" }}>

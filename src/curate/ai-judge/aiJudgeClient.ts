@@ -19,11 +19,41 @@ const VALID_MECHS = new Set(CURATION_MECHANISMS.map((m) => m.id));
 /**
  * Downsamples and compresses an image to a lightweight JPEG data URL (max 800px, ~80KB)
  * to eliminate downstream URL fetching delays and drastically cut vision model inference time.
+ * Seamlessly resolves internal relative URLs (/api/curate/media/proxy) and falls back to Blob reader.
  */
 export const prepareOptimizedImagePayload = async (imageUrl: string): Promise<string> => {
-  if (!imageUrl || typeof window === "undefined" || !imageUrl.startsWith("http")) {
-    return imageUrl;
+  if (!imageUrl || typeof window === "undefined") {
+    return imageUrl || "";
   }
+
+  // Resolve relative URLs (e.g. /api/curate/media/proxy?id=...) to absolute origin
+  let resolvedUrl = imageUrl.trim();
+  if (!resolvedUrl.startsWith("http://") && !resolvedUrl.startsWith("https://") && !resolvedUrl.startsWith("data:")) {
+    const origin = window.location.origin.replace(/\/+$/, "");
+    const cleanPath = resolvedUrl.startsWith("/") ? resolvedUrl : `/${resolvedUrl}`;
+    resolvedUrl = `${origin}${cleanPath}`;
+  }
+
+  // If already a data URI, return as-is
+  if (resolvedUrl.startsWith("data:")) {
+    return resolvedUrl;
+  }
+
+  const fetchBlobAsDataUrl = async (url: string): Promise<string> => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return url;
+      const blob = await res.blob();
+      return await new Promise<string>((resBlob, rejBlob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resBlob((reader.result as string) || url);
+        reader.onerror = rejBlob;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return url;
+    }
+  };
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -49,7 +79,7 @@ export const prepareOptimizedImagePayload = async (imageUrl: string): Promise<st
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve(imageUrl);
+          resolve(resolvedUrl);
           return;
         }
 
@@ -57,11 +87,13 @@ export const prepareOptimizedImagePayload = async (imageUrl: string): Promise<st
         const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
         resolve(dataUrl);
       } catch {
-        resolve(imageUrl);
+        fetchBlobAsDataUrl(resolvedUrl).then(resolve).catch(() => resolve(resolvedUrl));
       }
     };
-    img.onerror = () => resolve(imageUrl);
-    img.src = imageUrl;
+    img.onerror = () => {
+      fetchBlobAsDataUrl(resolvedUrl).then(resolve).catch(() => resolve(resolvedUrl));
+    };
+    img.src = resolvedUrl;
   });
 };
 

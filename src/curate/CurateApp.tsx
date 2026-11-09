@@ -20,6 +20,7 @@ import type { AiJudgeConfig, AiJudgeDecision } from "./ai-judge/aiJudgeTypes";
 import { DEFAULT_AI_JUDGE_CONFIG } from "./ai-judge/aiJudgeTypes";
 import AiJudgeConsole from "./ai-judge/AiJudgeConsole";
 import { useAiJudgeLoop } from "./ai-judge/useAiJudgeLoop";
+import { analyzeMemeWithAi } from "./ai-judge/aiJudgeClient";
 import { useIsMobile } from "./useIsMobile";
 import { useCurateGestures } from "./useCurateGestures";
 import "./curate.css";
@@ -586,6 +587,30 @@ export default function CurateApp() {
     aiAdvanceRef.current = handleAiAdvisoryAdvance;
   }, [handleAiAdvisoryAdvance]);
 
+  const [isSingleEvaluating, setIsSingleEvaluating] = useState(false);
+
+  const handleTestEvaluateCurrentMeme = useCallback(async () => {
+    const meme = stateRef.current.currentMeme;
+    if (!meme || isSingleEvaluating) return;
+    setIsSingleEvaluating(true);
+    setToast({ message: "Analyzing with AI vision model...", type: "warning" });
+    try {
+      const decision = await analyzeMemeWithAi(meme, aiConfig);
+      handleApplyAiDecision(decision);
+      await handleAiAdvisoryAdvance(decision);
+      setToast({
+        message: `AI Evaluation Complete: ${decision.corpus_status.toUpperCase()} (${Math.round((decision.confidence || 0) * 100)}%)`,
+        type: "success"
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Test evaluate failed:", err);
+      setToast({ message: `AI Evaluation Failed: ${msg}`, type: "error" });
+    } finally {
+      setIsSingleEvaluating(false);
+    }
+  }, [aiConfig, isSingleEvaluating, handleApplyAiDecision, handleAiAdvisoryAdvance]);
+
   // Jump directly to the latest unreviewed meme
   const handleJumpToUnreviewed = useCallback(async () => {
     const stack = historyStackRef.current;
@@ -1103,7 +1128,11 @@ export default function CurateApp() {
             return;
           }
           if (!hasJ4 && !hasJ5) {
-            // No AI evaluation ready: switch to override mode
+            // No AI evaluation ready: if AI judge, trigger isolated evaluation; otherwise open manual override
+            if (isAiJudge) {
+              handleTestEvaluateCurrentMeme();
+              return;
+            }
             setOverrideMode(true);
             return;
           }
@@ -1766,6 +1795,9 @@ export default function CurateApp() {
               isMobile={true}
               isAiJudge={isAiJudge}
               judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
+              onTestEvaluate={handleTestEvaluateCurrentMeme}
+              isTesting={isSingleEvaluating}
+              activeModel={aiConfig.model}
             />
           )}
 
@@ -2185,13 +2217,16 @@ export default function CurateApp() {
                 onForceRemove={handleForceRemove}
                 isAiJudge={isAiJudge}
                 judgeName={user?.display_name || (user?.id === "user-judge5" ? "Judge Five" : "Judge Four")}
+                onTestEvaluate={handleTestEvaluateCurrentMeme}
+                isTesting={isSingleEvaluating}
+                activeModel={aiConfig.model}
               />
             )}
 
             <div style={{ display: overrideMode ? "block" : "none" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", background: "#1c1b1b", padding: "10px 14px", border: "1px solid #f4c300", boxShadow: "2px 2px 0px #f4c300" }}>
-                <span style={{ fontSize: "15px", color: "#f4c300", fontFamily: "Anton", letterSpacing: "0.5px" }}>
-                  ✏️ MANUAL OVERRIDE MODE
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", background: "#1c1b1b", padding: "10px 14px", border: isAiJudge ? "1px solid #00f0ff" : "1px solid #f4c300", boxShadow: isAiJudge ? "2px 2px 0px #00f0ff" : "2px 2px 0px #f4c300" }}>
+                <span style={{ fontSize: "15px", color: isAiJudge ? "#00f0ff" : "#f4c300", fontFamily: "Anton", letterSpacing: "0.5px" }}>
+                  {isAiJudge ? "⚠️ ADMIN OVERRIDE FOR AI JUDGE" : "✏️ MANUAL OVERRIDE MODE"}
                 </span>
                 <button
                   type="button"
@@ -2209,6 +2244,12 @@ export default function CurateApp() {
                   BACK TO AI REVIEW [ESC]
                 </button>
               </div>
+
+              {isAiJudge && (
+                <div style={{ background: "#1a1500", border: "1px solid #f4c300", color: "#f4c300", padding: "8px 12px", fontSize: "12px", marginBottom: "12px", lineHeight: "1.4" }}>
+                  <strong>Admin Emergency Override:</strong> You are submitting a manual decision on behalf of {user?.display_name || "AI Judge"}. This will record your manual vote for this slot.
+                </div>
+              )}
 
               <AiPreJudgePanel prediction={currentMeme?.ai_prediction ?? null} />
 

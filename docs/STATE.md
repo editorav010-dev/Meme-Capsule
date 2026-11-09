@@ -520,6 +520,38 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
     - Node test runner: 9 consensus tests passing (`curationConsensus`).
   - Production build: `tsc && vite build` compiled 1,718 modules cleanly in 16.63s with zero errors.
 
+---
+
+## 18. AI Curation Resilience, Two-Tier Circuit Breaker & Admin Automation Logs (November 9, 2026)
+
+- **1. Image Payload Serialization (`src/curate/ai-judge/aiJudgeClient.ts`)**:
+  - **The Root Cause**: Fallback relative URLs (`/api/curate/media/proxy?id=...`) bypassed canvas downscaling and were passed directly to external vision models as raw relative strings, causing downstream parsing errors.
+  - **The Fix**: Updated `prepareOptimizedImagePayload` to resolve relative URLs to absolute origins and convert them to lightweight JPEG base64 data URIs via HTML5 canvas, with a fallback `FileReader` blob loader.
+
+- **2. Two-Tier Circuit Breaker & Resilient Retries (`src/curate/ai-judge/useAiJudgeLoop.ts`)**:
+  - **Fatal Configuration Errors (401, 403, 404, 410, model retired)**: Fail fast with **0 retries** per item. Circuit breaker trips immediately after **2 consecutive fatal errors**, pausing the runner with an explicit diagnostic message and zero wasted API credits.
+  - **Transient Network Errors (502, 503, 504, timeouts, network glitches)**: Allows up to 2 retries per meme with exponential backoff (1.5s, 3.5s + jitter). Circuit breaker trips after **10 consecutive transient errors**.
+  - **Zero Queue Pollution**: Eliminated fabricated fallback decisions. When a meme cannot be curated, it is skipped cleanly in runner state and remains in `Draft (Awaiting AI Evaluation)`, strictly preventing raw memes from flooding human judges' `Review Later` queue.
+
+- **3. Restored AI-Specific Evaluation & Inspection Workspace (`src/curate/AiReviewPanel.tsx`, `CurateApp.tsx`)**:
+  - Removed human ballot options (`[K] [X] [D] [R]`) from AI Judge sessions.
+  - Delivered an AI Evaluation & Inspection workspace with:
+    - `[ ⚡ TEST EVALUATE THIS MEME (AI) ]` button for instant, isolated single-item testing.
+    - Live AI contract inspector showing output JSON schema, supported taxonomy, and active model.
+    - Emergency Curator Override relegated to an intentional modal with hotkey `[ Shift + O ]`.
+    - Existing Model Configuration drawer UI kept **100% intact and untouched**.
+
+- **4. Central Notifications & Automation Logs (`functions/api/admin/system-logs.ts`, `src/admin/AutomationLogsTab.tsx`)**:
+  - D1 migration `026_system_event_logs.sql` creating indexed telemetry table.
+  - REST API `GET / POST / DELETE /api/admin/system-logs` with pagination, filtering, sanitized payload details, and automatic 14-day pruning within Cloudflare Free Tier budgets.
+  - New "Notifications & Logs" tab in Admin Console with metric cards (`Errors 24h`, `Fatal Count`, `Total Logged`), workflow/severity filters, and diagnostic inspection modal.
+
+- **5. Verification & Tests**:
+  - Added `tests/aiJudgeResilience.test.ts` testing circuit breaker classification, fatal vs transient failure limits, counter resets, and payload sanitization.
+  - Full test suite passing: 31 Vitest tests + 9 Node consensus tests (40/40 tests passing).
+  - Production build: `npm run build` compiled 1,719 modules cleanly with zero errors.
+
+
 
 
 
