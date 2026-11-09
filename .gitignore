@@ -13,3 +13,4 @@ dist/
 *-firebase-adminsdk-*.json
 *.zip
 0.26.0
+_worker.bundle

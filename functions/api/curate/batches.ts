@@ -6,7 +6,8 @@
  */
 
 import type { PagesFunction } from "../../_shared/pages";
-import { json, validateSession, type Env } from "../../_shared/d1r2";
+import { json, type Env } from "../../_shared/d1r2";
+import { validateSession } from "../../_shared/catAuth";
 import { hasIngestionSchema } from "../../_shared/ingestion";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {

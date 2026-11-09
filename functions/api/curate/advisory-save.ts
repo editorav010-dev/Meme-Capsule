@@ -8,7 +8,8 @@
  */
 
 import type { PagesFunction } from "../../_shared/pages";
-import { json, validateSession, type Env } from "../../_shared/d1r2";
+import { json, type Env } from "../../_shared/d1r2";
+import { validateSession } from "../../_shared/catAuth";
 import { refreshBatchStatus } from "../../_shared/ingestion";
 
 interface AdvisorySavePayload {
