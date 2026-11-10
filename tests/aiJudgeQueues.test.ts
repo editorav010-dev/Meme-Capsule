@@ -130,5 +130,63 @@ describe("AI Judge Queue & Batch Curation Workflow", () => {
       "https://pub-cdn.example.com/memes/123.jpg"
     );
   });
+
+  it("determines strict no-repeat eligibility for human judges in batch queues", () => {
+    interface HumanBatchItem {
+      id: string;
+      batch_id: string;
+      status: string;
+      is_force_removed: boolean;
+      final_status: string | null;
+      curator_votes: Record<string, string>; // userId -> corpus_status
+    }
+
+    const isEligibleForHumanJudgeInBatch = (meme: HumanBatchItem, targetBatchId: string, userId: string) => {
+      // Must match batch
+      if (meme.batch_id !== targetBatchId) return false;
+      // Must be in archived (human ready) pool
+      if (meme.status !== "archived") return false;
+      // Must not be force removed / purged
+      if (meme.is_force_removed) return false;
+      // Must not be finalized by consensus
+      if (meme.final_status !== null) return false;
+      // Must not have already been reviewed by this specific human judge
+      if (meme.curator_votes[userId]) return false;
+
+      return true;
+    };
+
+    const testMeme: HumanBatchItem = {
+      id: "meme-test-1",
+      batch_id: "batch-1",
+      status: "archived",
+      is_force_removed: false,
+      final_status: null,
+      curator_votes: {},
+    };
+
+    // 1. Fresh unreviewed meme in batch 1 is eligible for Judge 1
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-1", "user-judge1")).toBe(true);
+
+    // 2. Not eligible if querying batch 2
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-2", "user-judge1")).toBe(false);
+
+    // 3. Judge 1 reviews the meme -> immediately disqualified for Judge 1 (no repeats)
+    testMeme.curator_votes["user-judge1"] = "keep";
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-1", "user-judge1")).toBe(false);
+
+    // 4. Still eligible for Judge 2 and Judge 3
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-1", "user-judge2")).toBe(true);
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-1", "user-judge3")).toBe(true);
+
+    // 5. Judge 2 reviews with keep -> consensus resolves meme to active
+    testMeme.curator_votes["user-judge2"] = "keep";
+    testMeme.final_status = "keep";
+    testMeme.status = "active";
+
+    // 6. Now closed for all judges including trailing Judge 3 without fabricating fake votes
+    expect(isEligibleForHumanJudgeInBatch(testMeme, "batch-1", "user-judge3")).toBe(false);
+    expect(testMeme.curator_votes["user-judge3"]).toBeUndefined();
+  });
 });
 

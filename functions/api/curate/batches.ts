@@ -28,6 +28,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const { results } = await env.DB.prepare(`
       SELECT 
         b.id,
+        b.actor_name,
         b.status,
         b.created_at,
         b.total_items,
@@ -35,31 +36,48 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         COUNT(j.job_id) as total_jobs,
         SUM(CASE WHEN j.upload_state = 'uploaded' AND (j.duplicate_of_job_id IS NULL OR j.duplicate_of_job_id LIKE 'replace:%') THEN 1 ELSE 0 END) AS valid_drafts,
         SUM(CASE WHEN j.upload_state = 'failed' THEN 1 ELSE 0 END) AS failed_uploads,
-        SUM(CASE WHEN e4.state = 'succeeded' THEN 1 ELSE 0 END) AS j4_completed
+        SUM(CASE WHEN e4.state = 'succeeded' THEN 1 ELSE 0 END) AS j4_completed,
+        SUM(CASE WHEN fr.meme_id IS NULL AND (j.duplicate_of_job_id IS NULL OR j.duplicate_of_job_id LIKE 'replace:%') THEN 1 ELSE 0 END) AS eligible_memes,
+        SUM(CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END) AS user_reviewed,
+        SUM(CASE WHEN mcf.meme_id IS NOT NULL THEN 1 ELSE 0 END) AS final_resolved
       FROM ingestion_batches b
       LEFT JOIN ingestion_jobs j ON b.id = j.batch_id
       LEFT JOIN ingestion_ai_evaluations e4 ON j.job_id = e4.job_id AND e4.judge_key = 'judge4'
+      LEFT JOIN meme_curation c ON j.meme_id = c.meme_id AND c.user_id = ?
+      LEFT JOIN meme_curation_final mcf ON j.meme_id = mcf.meme_id
+      LEFT JOIN meme_force_removals fr ON j.meme_id = fr.meme_id
       WHERE b.status != 'cancelled'
-      GROUP BY b.id
+      GROUP BY b.id, b.actor_name, b.status, b.created_at, b.total_items, b.total_bytes
       ORDER BY b.created_at DESC
       LIMIT ?
-    `).bind(limit).all();
+    `).bind(sessionUser.id, limit).all();
 
     const batches = (results || []).map((row: any) => {
       const validDrafts = Number(row.valid_drafts || 0);
+      const eligibleMemes = Number(row.eligible_memes || 0) || validDrafts;
       const j4Completed = Number(row.j4_completed || 0);
+      const userReviewed = Number(row.user_reviewed || 0);
+      const finalResolved = Number(row.final_resolved || 0);
 
       return {
         id: row.id,
+        name: row.actor_name || row.id,
         status: row.status,
         created_at: row.created_at,
         total_items: Number(row.total_items || 0),
         total_bytes: Number(row.total_bytes || 0),
         valid_drafts: validDrafts,
+        eligible_memes: eligibleMemes,
         failed_uploads: Number(row.failed_uploads || 0),
         judge4: {
           completed: j4Completed,
           remaining: Math.max(0, validDrafts - j4Completed),
+        },
+        user_progress: {
+          reviewed: userReviewed,
+          remaining: Math.max(0, eligibleMemes - userReviewed),
+          percent_complete: eligibleMemes > 0 ? Math.min(100, Math.round((userReviewed / eligibleMemes) * 100)) : 0,
+          final_resolved: finalResolved
         },
         both_completed: j4Completed,
         percent_complete: validDrafts > 0 ? Math.min(100, Math.round((j4Completed / validDrafts) * 100)) : 0,

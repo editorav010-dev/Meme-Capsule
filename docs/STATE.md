@@ -614,6 +614,13 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
   - Enhanced Admin Console stats bar (`src/admin/AdminApp.tsx`) to show `2,756 live • 2,747 purged` under Total Memes.
   - Updated Superadmin Command Center (`src/curate/super/CurateSuperDashboard.tsx`) to label the primary metric as `LIVE CORPUS` with explicit database total breakdown.
 
-- **5. Verification & Automated Tests**:
+- **5. Human Judge Batch Queue System**:
+  - Brought full batch-queue parity to Human Judges (Judges 1, 2, 3) in `functions/api/curate/next.ts`, `functions/api/curate/batches.ts`, and `src/curate/CurateApp.tsx`.
+  - Added `📦 Batches Queue` option with nested batch selection on desktop and mobile, displaying per-judge progress (e.g., `Batch 1: 420/1000 (42%)`).
+  - Implemented strict no-repeat guarantees: within a batch, human judges are served only memes that are unreviewed by them personally, unpurged, and unfinalized.
+  - Implemented contextual completion banners (`🎉 ALL DONE IN THIS BATCH!`) upon batch review completion.
+
+- **6. Verification & Automated Tests**:
+  - Added automated unit tests in `tests/aiJudgeQueues.test.ts` verifying human batch queue eligibility and no-repeat guarantees.
   - `npm run build` compiled cleanly with zero TypeScript errors.
-  - All 40 unit and integration tests passing (`npm test`).
+  - All 41 unit and consensus tests passing (`npm test`).

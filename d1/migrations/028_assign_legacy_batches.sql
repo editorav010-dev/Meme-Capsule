@@ -6,11 +6,11 @@
 -- 1. Create synthetic legacy batches
 INSERT OR IGNORE INTO ingestion_batches (id, idempotency_key, actor_id, actor_name, status, total_items)
 VALUES 
-  ('legacy-batch-1', 'legacy-batch-1-key', 'system', 'Legacy Batch 1 (1-1000)', 'complete', 1000),
-  ('legacy-batch-2', 'legacy-batch-2-key', 'system', 'Legacy Batch 2 (1001-2000)', 'complete', 1000),
-  ('legacy-batch-3', 'legacy-batch-3-key', 'system', 'Legacy Batch 3 (2001-3000)', 'complete', 1000),
-  ('legacy-batch-4', 'legacy-batch-4-key', 'system', 'Legacy Batch 4 (3001-4000)', 'complete', 1000),
-  ('legacy-batch-5', 'legacy-batch-5-key', 'system', 'Legacy Batch 5 (4001+)', 'complete', 560);
+  ('legacy-batch-1', 'legacy-batch-1-key', 'system', 'Batch 1 (Legacy 1–1000)', 'complete', 1000),
+  ('legacy-batch-2', 'legacy-batch-2-key', 'system', 'Batch 2 (Legacy 1001–2000)', 'complete', 1000),
+  ('legacy-batch-3', 'legacy-batch-3-key', 'system', 'Batch 3 (Legacy 2001–3000)', 'complete', 1000),
+  ('legacy-batch-4', 'legacy-batch-4-key', 'system', 'Batch 4 (Legacy 3001–4000)', 'complete', 1000),
+  ('legacy-batch-5', 'legacy-batch-5-key', 'system', 'Batch 5 (Legacy 4001–4560)', 'complete', 560);
 
 -- 2. Create synthetic ingestion jobs for legacy memes
 -- Mapping unbatched memes to the new synthetic batches based on uploaded_at order

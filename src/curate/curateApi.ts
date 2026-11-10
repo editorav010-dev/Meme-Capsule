@@ -53,13 +53,21 @@ export async function fetchNextMeme(
 
 export interface CurateBatchItem {
   id: string;
+  name?: string;
   status: string;
   created_at: string;
   total_items: number;
   total_bytes: number;
   valid_drafts: number;
+  eligible_memes?: number;
   failed_uploads: number;
   judge4: { completed: number; remaining: number };
+  user_progress?: {
+    reviewed: number;
+    remaining: number;
+    percent_complete: number;
+    final_resolved: number;
+  };
   both_completed: number;
   percent_complete: number;
 }

@@ -225,34 +225,58 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           }
         }
       } else {
-        const isCacheExpired = !statsCache || Date.now() > statsCache.expiresAt;
-        if (!statsCache || isCacheExpired) {
+        if (filter === "batch" && batchId) {
           try {
-            const totalRes = await env.DB.prepare(`SELECT COUNT(1) as cnt FROM memes m ${intakeJoin} WHERE 1 = 1 ${intakeWhere}`).first<{ cnt: number }>();
-            total = totalRes?.cnt ?? 0;
+            const batchTotalRes = await env.DB.prepare(`
+              SELECT COUNT(1) as cnt FROM memes m
+              JOIN ingestion_jobs ij ON m.id = ij.meme_id
+              LEFT JOIN meme_force_removals fr ON m.id = fr.meme_id
+              WHERE ij.batch_id = ?
+                AND fr.meme_id IS NULL
+                AND (ij.duplicate_of_job_id IS NULL OR ij.duplicate_of_job_id LIKE 'replace:%')
+            `).bind(batchId).first<{ cnt: number }>();
+            total = batchTotalRes?.cnt ?? 0;
+
+            const batchRevRes = await env.DB.prepare(`
+              SELECT COUNT(1) as cnt FROM meme_curation c
+              JOIN ingestion_jobs ij ON c.meme_id = ij.meme_id
+              WHERE ij.batch_id = ? AND c.user_id = ?
+            `).bind(batchId, userId).first<{ cnt: number }>();
+            reviewed = batchRevRes?.cnt ?? 0;
           } catch {
             total = 0;
+            reviewed = 0;
+          }
+        } else {
+          const isCacheExpired = !statsCache || Date.now() > statsCache.expiresAt;
+          if (!statsCache || isCacheExpired) {
+            try {
+              const totalRes = await env.DB.prepare(`SELECT COUNT(1) as cnt FROM memes m ${intakeJoin} WHERE 1 = 1 ${intakeWhere}`).first<{ cnt: number }>();
+              total = totalRes?.cnt ?? 0;
+            } catch {
+              total = 0;
+            }
+
+            statsCache = {
+              total,
+              expiresAt: Date.now() + STATS_CACHE_TTL_MS
+            };
+          } else {
+            total = statsCache.total;
           }
 
-          statsCache = {
-            total,
-            expiresAt: Date.now() + STATS_CACHE_TTL_MS
-          };
-        } else {
-          total = statsCache.total;
-        }
+          try {
+            const reviewedRes = await env.DB.prepare(
+              "SELECT COUNT(1) as cnt FROM meme_curation WHERE user_id = ?"
+            ).bind(userId).first<{ cnt: number }>();
+            const forceUserRes = await env.DB.prepare(
+              "SELECT COUNT(1) as cnt FROM meme_force_removals WHERE removed_by = ?"
+            ).bind(userId).first<{ cnt: number }>().catch(() => null);
 
-        try {
-          const reviewedRes = await env.DB.prepare(
-            "SELECT COUNT(1) as cnt FROM meme_curation WHERE user_id = ?"
-          ).bind(userId).first<{ cnt: number }>();
-          const forceUserRes = await env.DB.prepare(
-            "SELECT COUNT(1) as cnt FROM meme_force_removals WHERE removed_by = ?"
-          ).bind(userId).first<{ cnt: number }>().catch(() => null);
-
-          reviewed = (reviewedRes?.cnt ?? 0) + (forceUserRes?.cnt ?? 0);
-        } catch {
-          reviewed = 0;
+            reviewed = (reviewedRes?.cnt ?? 0) + (forceUserRes?.cnt ?? 0);
+          } catch {
+            reviewed = 0;
+          }
         }
       }
 
@@ -346,51 +370,134 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       }
     } else {
       // -------------------------------------------------------------
-      // HUMAN JUDGE QUEUE: Preserves 6 editorial queues
+      // HUMAN JUDGE QUEUE: Preserves 6 editorial queues & adds Batches Queue
       // -------------------------------------------------------------
-      let filterCondition = "";
-      if (filter === "unreviewed") {
-        filterCondition = "c.corpus_status IS NULL AND mcf.corpus_status IS NULL AND m.curation_status IS NULL";
-      } else if (filter === "review_later") {
-        filterCondition = "(m.curation_status = 'review_later' OR c.corpus_status = 'review_later' OR mcf.corpus_status = 'review_later')";
-      } else if (filter === "keep") {
-        filterCondition = "(m.curation_status = 'keep' OR c.corpus_status = 'keep' OR mcf.corpus_status = 'keep')";
-      } else if (filter === "excluded") {
-        filterCondition = "(m.curation_status = 'excluded' OR c.corpus_status = 'excluded' OR mcf.corpus_status = 'excluded')";
-      } else if (filter === "duplicate") {
-        filterCondition = "(m.curation_status = 'duplicate' OR c.corpus_status = 'duplicate' OR mcf.corpus_status = 'duplicate')";
-      } else {
-        filterCondition = "1=1";
-      }
+      const hasHumanBatch = filter === "batch" && Boolean(batchId);
 
-      if (currentUploadedAt) {
-        if (direction === "prev") {
-          if (filter === "unreviewed") {
+      if (hasHumanBatch) {
+        // Human Batch Queue: Serves only unreviewed, unpurged, unfinalized memes for this batch
+        const HUMAN_BATCH_FROM = `
+          FROM memes m
+          JOIN ingestion_jobs ij ON m.id = ij.meme_id
+          LEFT JOIN meme_force_removals fr ON m.id = fr.meme_id
+          LEFT JOIN meme_curation c ON m.id = c.meme_id AND c.user_id = ?
+          LEFT JOIN meme_curation_final mcf ON m.id = mcf.meme_id
+          LEFT JOIN ai_curation_predictions ai ON m.id = ai.meme_id
+          WHERE fr.meme_id IS NULL
+            AND ij.batch_id = ?
+            AND m.status = 'archived'
+            AND mcf.corpus_status IS NULL
+            AND c.corpus_status IS NULL
+        `;
+
+        if (currentUploadedAt) {
+          if (direction === "prev") {
             const prevRes = await env.DB.prepare(`
-              SELECT
-                ${SELECT_COLUMNS}
+              SELECT ${SELECT_COLUMNS}
               FROM memes m
-              LEFT JOIN meme_force_removals fr
-                ON m.id = fr.meme_id
-              LEFT JOIN meme_curation c
-                ON m.id = c.meme_id
-               AND c.user_id = ?
-              LEFT JOIN meme_curation_final mcf
-                ON m.id = mcf.meme_id
-              LEFT JOIN ai_curation_predictions ai
-                ON m.id = ai.meme_id
-              ${intakeJoin}
+              JOIN ingestion_jobs ij ON m.id = ij.meme_id
+              LEFT JOIN meme_force_removals fr ON m.id = fr.meme_id
+              LEFT JOIN meme_curation c ON m.id = c.meme_id AND c.user_id = ?
+              LEFT JOIN meme_curation_final mcf ON m.id = mcf.meme_id
+              LEFT JOIN ai_curation_predictions ai ON m.id = ai.meme_id
               WHERE fr.meme_id IS NULL
-                ${intakeWhere}
+                AND ij.batch_id = ?
                 AND c.user_id = ?
                 AND c.corpus_status IS NOT NULL
                 AND m.uploaded_at < ?
               ORDER BY m.uploaded_at DESC
               LIMIT 1
-            `).bind(userId, userId, currentUploadedAt).all<MemeRow>();
+            `).bind(userId, batchId, userId, currentUploadedAt).all<MemeRow>();
             targetRows = prevRes.results || [];
           } else {
-            const prevRes = await env.DB.prepare(`
+            const nextRes = await env.DB.prepare(`
+              SELECT ${SELECT_COLUMNS}
+              ${HUMAN_BATCH_FROM}
+                AND m.uploaded_at > ?
+              ORDER BY m.uploaded_at ASC
+              LIMIT ${limit}
+            `).bind(userId, batchId, currentUploadedAt).all<MemeRow>();
+            targetRows = nextRes.results || [];
+          }
+        }
+
+        if (targetRows.length === 0) {
+          const defaultRes = await env.DB.prepare(`
+            SELECT ${SELECT_COLUMNS}
+            ${HUMAN_BATCH_FROM}
+            ORDER BY m.uploaded_at ASC
+            LIMIT ${limit}
+          `).bind(userId, batchId).all<MemeRow>();
+          targetRows = defaultRes.results || [];
+        }
+      } else {
+        let filterCondition = "";
+        if (filter === "unreviewed") {
+          filterCondition = "c.corpus_status IS NULL AND mcf.corpus_status IS NULL AND m.curation_status IS NULL";
+        } else if (filter === "review_later") {
+          filterCondition = "(m.curation_status = 'review_later' OR c.corpus_status = 'review_later' OR mcf.corpus_status = 'review_later')";
+        } else if (filter === "keep") {
+          filterCondition = "(m.curation_status = 'keep' OR c.corpus_status = 'keep' OR mcf.corpus_status = 'keep')";
+        } else if (filter === "excluded") {
+          filterCondition = "(m.curation_status = 'excluded' OR c.corpus_status = 'excluded' OR mcf.corpus_status = 'excluded')";
+        } else if (filter === "duplicate") {
+          filterCondition = "(m.curation_status = 'duplicate' OR c.corpus_status = 'duplicate' OR mcf.corpus_status = 'duplicate')";
+        } else {
+          filterCondition = "1=1";
+        }
+
+        if (currentUploadedAt) {
+          if (direction === "prev") {
+            if (filter === "unreviewed") {
+              const prevRes = await env.DB.prepare(`
+                SELECT
+                  ${SELECT_COLUMNS}
+                FROM memes m
+                LEFT JOIN meme_force_removals fr
+                  ON m.id = fr.meme_id
+                LEFT JOIN meme_curation c
+                  ON m.id = c.meme_id
+                 AND c.user_id = ?
+                LEFT JOIN meme_curation_final mcf
+                  ON m.id = mcf.meme_id
+                LEFT JOIN ai_curation_predictions ai
+                  ON m.id = ai.meme_id
+                ${intakeJoin}
+                WHERE fr.meme_id IS NULL
+                  ${intakeWhere}
+                  AND c.user_id = ?
+                  AND c.corpus_status IS NOT NULL
+                  AND m.uploaded_at < ?
+                ORDER BY m.uploaded_at DESC
+                LIMIT 1
+              `).bind(userId, userId, currentUploadedAt).all<MemeRow>();
+              targetRows = prevRes.results || [];
+            } else {
+              const prevRes = await env.DB.prepare(`
+                SELECT
+                  ${SELECT_COLUMNS}
+                FROM memes m
+                LEFT JOIN meme_force_removals fr
+                  ON m.id = fr.meme_id
+                LEFT JOIN meme_curation c
+                  ON m.id = c.meme_id
+                 AND c.user_id = ?
+                LEFT JOIN meme_curation_final mcf
+                  ON m.id = mcf.meme_id
+                LEFT JOIN ai_curation_predictions ai
+                  ON m.id = ai.meme_id
+                ${intakeJoin}
+                WHERE fr.meme_id IS NULL
+                  ${intakeWhere}
+                  AND (${filterCondition})
+                  AND m.uploaded_at < ?
+                ORDER BY m.uploaded_at DESC
+                LIMIT 1
+              `).bind(userId, currentUploadedAt).all<MemeRow>();
+              targetRows = prevRes.results || [];
+            }
+          } else {
+            const nextRes = await env.DB.prepare(`
               SELECT
                 ${SELECT_COLUMNS}
               FROM memes m
@@ -407,14 +514,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
               WHERE fr.meme_id IS NULL
                 ${intakeWhere}
                 AND (${filterCondition})
-                AND m.uploaded_at < ?
-              ORDER BY m.uploaded_at DESC
-              LIMIT 1
+                AND m.uploaded_at > ?
+              ORDER BY m.uploaded_at ASC
+              LIMIT ${limit}
             `).bind(userId, currentUploadedAt).all<MemeRow>();
-            targetRows = prevRes.results || [];
+            targetRows = nextRes.results || [];
           }
-        } else {
-          const nextRes = await env.DB.prepare(`
+        }
+
+        if (targetRows.length === 0) {
+          const defaultRes = await env.DB.prepare(`
             SELECT
               ${SELECT_COLUMNS}
             FROM memes m
@@ -431,36 +540,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
             WHERE fr.meme_id IS NULL
               ${intakeWhere}
               AND (${filterCondition})
-              AND m.uploaded_at > ?
             ORDER BY m.uploaded_at ASC
             LIMIT ${limit}
-          `).bind(userId, currentUploadedAt).all<MemeRow>();
-          targetRows = nextRes.results || [];
+          `).bind(userId).all<MemeRow>();
+          targetRows = defaultRes.results || [];
         }
-      }
-
-      if (targetRows.length === 0) {
-        const defaultRes = await env.DB.prepare(`
-          SELECT
-            ${SELECT_COLUMNS}
-          FROM memes m
-          LEFT JOIN meme_force_removals fr
-            ON m.id = fr.meme_id
-          LEFT JOIN meme_curation c
-            ON m.id = c.meme_id
-           AND c.user_id = ?
-          LEFT JOIN meme_curation_final mcf
-            ON m.id = mcf.meme_id
-          LEFT JOIN ai_curation_predictions ai
-            ON m.id = ai.meme_id
-          ${intakeJoin}
-          WHERE fr.meme_id IS NULL
-            ${intakeWhere}
-            AND (${filterCondition})
-          ORDER BY m.uploaded_at ASC
-          LIMIT ${limit}
-        `).bind(userId).all<MemeRow>();
-        targetRows = defaultRes.results || [];
       }
     }
 

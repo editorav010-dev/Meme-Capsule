@@ -114,7 +114,7 @@ export default function CurateApp() {
   }, [isAiJudge, filterQueue]);
 
   useEffect(() => {
-    if (isAiJudge && token) {
+    if (token) {
       setLoadingBatches(true);
       fetchCurateBatches()
         .then((res) => {
@@ -128,7 +128,7 @@ export default function CurateApp() {
         .catch((err) => console.error("Error loading curation batches:", err))
         .finally(() => setLoadingBatches(false));
     }
-  }, [isAiJudge, token]);
+  }, [token]);
 
 
   // AI Judge State & Hook
@@ -1415,27 +1415,71 @@ export default function CurateApp() {
                   )}
                 </div>
               ) : (
-                <select
-                  value={filterQueue}
-                  onChange={(e) => setFilterQueue(e.target.value)}
-                  style={{
-                    background: "#262626",
-                    border: "1px solid #9b30ff",
-                    color: "#f4c300",
-                    padding: "4px 10px",
-                    fontFamily: "Oswald",
-                    fontSize: "12px",
-                    outline: "none",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="unreviewed">Unreviewed Memes</option>
-                  <option value="review_later">⚠️ Review Later Queue</option>
-                  <option value="keep">✓ Kept Active Memes</option>
-                  <option value="excluded">✕ Excluded Memes</option>
-                  <option value="duplicate">⎘ Duplicates</option>
-                  <option value="all">All Corpus</option>
-                </select>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <select
+                    value={filterQueue}
+                    onChange={(e) => {
+                      const nextQ = e.target.value;
+                      setFilterQueue(nextQ);
+                      if (nextQ === "batch" && batches.length > 0 && !selectedBatchId) {
+                        setSelectedBatchId(batches[0].id);
+                      }
+                    }}
+                    style={{
+                      background: "#262626",
+                      border: "1px solid #9b30ff",
+                      color: "#f4c300",
+                      padding: "4px 10px",
+                      fontFamily: "Oswald",
+                      fontSize: "12px",
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="unreviewed">⚡ Unreviewed Memes (Global)</option>
+                    <option value="batch">📦 Batches Queue</option>
+                    <option value="review_later">⚠️ Review Later Queue</option>
+                    <option value="keep">✓ Kept Active Memes</option>
+                    <option value="excluded">✕ Excluded Memes</option>
+                    <option value="duplicate">⎘ Duplicates</option>
+                    <option value="all">All Corpus</option>
+                  </select>
+
+                  {filterQueue === "batch" && (
+                    <select
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(e.target.value)}
+                      style={{
+                        background: "#1c1b1b",
+                        border: "1px solid #9b30ff",
+                        color: "#f4c300",
+                        padding: "4px 8px",
+                        fontFamily: "monospace",
+                        fontSize: "11px",
+                        maxWidth: "320px",
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {batches.length === 0 ? (
+                        <option value="">No Ingestion Batches</option>
+                      ) : (
+                        batches.map((b) => {
+                          const prog = b.user_progress;
+                          const batchLabel = b.name || b.id.replace(/^batch-/, "").slice(0, 8);
+                          const total = b.eligible_memes || b.valid_drafts || b.total_items;
+                          const reviewed = prog ? prog.reviewed : 0;
+                          const pct = prog ? prog.percent_complete : 0;
+                          return (
+                            <option key={b.id} value={b.id}>
+                              {batchLabel}: {reviewed}/{total} ({pct}%)
+                            </option>
+                          );
+                        })
+                      )}
+                    </select>
+                  )}
+                </div>
               )}
 
               <button
@@ -1614,29 +1658,74 @@ export default function CurateApp() {
                 )}
               </div>
             ) : (
-              <select
-                value={filterQueue}
-                onChange={(e) => {
-                  setFilterQueue(e.target.value);
-                  setShowMobileMenu(false);
-                }}
-                style={{
-                  flex: 1,
-                  background: "#262626",
-                  border: "1px solid #9b30ff",
-                  color: "#f4c300",
-                  padding: "6px 8px",
-                  fontFamily: "Oswald",
-                  fontSize: "13px"
-                }}
-              >
-                <option value="unreviewed">Unreviewed Memes</option>
-                <option value="review_later">⚠️ Review Later Queue</option>
-                <option value="keep">✓ Kept Active Memes</option>
-                <option value="excluded">✕ Excluded Memes</option>
-                <option value="duplicate">⎘ Duplicates</option>
-                <option value="all">All Corpus</option>
-              </select>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                <select
+                  value={filterQueue}
+                  onChange={(e) => {
+                    const nextQ = e.target.value;
+                    setFilterQueue(nextQ);
+                    if (nextQ === "batch" && batches.length > 0 && !selectedBatchId) {
+                      setSelectedBatchId(batches[0].id);
+                    }
+                    if (nextQ !== "batch") {
+                      setShowMobileMenu(false);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    background: "#262626",
+                    border: "1px solid #9b30ff",
+                    color: "#f4c300",
+                    padding: "6px 8px",
+                    fontFamily: "Oswald",
+                    fontSize: "13px"
+                  }}
+                >
+                  <option value="unreviewed">⚡ Unreviewed Memes (Global)</option>
+                  <option value="batch">📦 Batches Queue</option>
+                  <option value="review_later">⚠️ Review Later Queue</option>
+                  <option value="keep">✓ Kept Active Memes</option>
+                  <option value="excluded">✕ Excluded Memes</option>
+                  <option value="duplicate">⎘ Duplicates</option>
+                  <option value="all">All Corpus</option>
+                </select>
+
+                {filterQueue === "batch" && (
+                  <select
+                    value={selectedBatchId}
+                    onChange={(e) => {
+                      setSelectedBatchId(e.target.value);
+                      setShowMobileMenu(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      background: "#1c1b1b",
+                      border: "1px solid #9b30ff",
+                      color: "#f4c300",
+                      padding: "6px 8px",
+                      fontFamily: "monospace",
+                      fontSize: "11px"
+                    }}
+                  >
+                    {batches.length === 0 ? (
+                      <option value="">No Ingestion Batches</option>
+                    ) : (
+                      batches.map((b) => {
+                        const prog = b.user_progress;
+                        const batchLabel = b.name || b.id.replace(/^batch-/, "").slice(0, 8);
+                        const total = b.eligible_memes || b.valid_drafts || b.total_items;
+                        const reviewed = prog ? prog.reviewed : 0;
+                        const pct = prog ? prog.percent_complete : 0;
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {batchLabel}: {reviewed}/{total} ({pct}%)
+                          </option>
+                        );
+                      })
+                    )}
+                  </select>
+                )}
+              </div>
             )}
           </div>
 
@@ -1838,8 +1927,14 @@ export default function CurateApp() {
                   />
                 ) : (
                   <div style={{ textAlign: "center", color: "#888", padding: "20px" }}>
-                    <h3 className="curate-anton" style={{ color: "#34C759", fontSize: "24px" }}>ALL DONE!</h3>
-                    <p style={{ fontSize: "12px" }}>Switch queues or export your curated dataset.</p>
+                    <h3 className="curate-anton" style={{ color: "#34C759", fontSize: "24px" }}>
+                      {filterQueue === "batch" ? "🎉 ALL DONE IN THIS BATCH!" : "ALL DONE!"}
+                    </h3>
+                    <p style={{ fontSize: "12px" }}>
+                      {filterQueue === "batch"
+                        ? "You have reviewed all eligible memes in this batch. Select another batch or queue above."
+                        : "Switch queues or export your curated dataset."}
+                    </p>
                   </div>
                 )}
               </div>
@@ -2056,8 +2151,14 @@ export default function CurateApp() {
                 />
               ) : (
                 <div style={{ textAlign: "center", color: "#888" }}>
-                  <h3 className="curate-anton" style={{ color: "#34C759", fontSize: "28px" }}>ALL DONE IN THIS QUEUE!</h3>
-                  <p style={{ fontSize: "13px" }}>Switch queues or export your curated dataset.</p>
+                  <h3 className="curate-anton" style={{ color: "#34C759", fontSize: "28px" }}>
+                    {filterQueue === "batch" ? "🎉 ALL DONE IN THIS BATCH!" : "ALL DONE IN THIS QUEUE!"}
+                  </h3>
+                  <p style={{ fontSize: "13px" }}>
+                    {filterQueue === "batch"
+                      ? "You have reviewed all eligible memes in this batch. Select another batch or queue above."
+                      : "Switch queues or export your curated dataset."}
+                  </p>
                 </div>
               )}
             </div>
