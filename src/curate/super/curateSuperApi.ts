@@ -19,7 +19,13 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export interface SuperSummaryResponse {
+  total_records?: number;
   total_memes: number;
+  live_corpus?: number;
+  active_count?: number;
+  archived_count?: number;
+  draft_count?: number;
+  excluded_count?: number;
   resolved_count: number;
   resolved_active_count?: number;
   resolved_excluded_count?: number;
@@ -41,6 +47,8 @@ export interface SuperSummaryResponse {
     user_id: string;
     user_name: string;
     total_reviewed: number;
+    personal_reviewed?: number;
+    active_reviewed?: number;
     kept: number;
     excluded: number;
     duplicates: number;

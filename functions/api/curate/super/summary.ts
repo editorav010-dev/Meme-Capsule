@@ -36,18 +36,48 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       return json({ error: "Superadmin credentials required." }, { status: 401 });
     }
 
-    // 1. Total memes in corpus (excluding force-removed)
+    // 1. Total memes in DB vs. unpurged live corpus
+    let totalRecords = 0;
     let totalMemes = 0;
+    try {
+      const allRes = await env.DB.prepare("SELECT COUNT(*) as cnt FROM memes").first<{ cnt: number }>();
+      totalRecords = allRes?.cnt ?? 0;
+    } catch {
+      totalRecords = 0;
+    }
+
     try {
       const totalCountRes = await env.DB.prepare(
         "SELECT COUNT(*) as cnt FROM memes WHERE id NOT IN (SELECT meme_id FROM meme_force_removals)"
       ).first<{ cnt: number }>();
-      totalMemes = totalCountRes?.cnt ?? 0;
+      totalMemes = totalCountRes?.cnt ?? totalRecords;
     } catch {
-      const totalCountRes = await env.DB.prepare(
-        "SELECT COUNT(*) as cnt FROM memes"
-      ).first<{ cnt: number }>();
-      totalMemes = totalCountRes?.cnt ?? 0;
+      totalMemes = totalRecords;
+    }
+
+    // Ingested status counts across the live corpus
+    let activeCount = 0;
+    let archivedCount = 0;
+    let draftCount = 0;
+    let excludedCount = 0;
+    try {
+      const statusRes = await env.DB.prepare(`
+        SELECT
+          SUM(CASE WHEN m.status = 'active' THEN 1 ELSE 0 END) as active_cnt,
+          SUM(CASE WHEN m.status = 'archived' AND (m.curation_status IS NULL OR m.curation_status != 'excluded') AND (f.corpus_status IS NULL OR f.corpus_status != 'excluded') THEN 1 ELSE 0 END) as archived_cnt,
+          SUM(CASE WHEN m.status = 'draft' THEN 1 ELSE 0 END) as draft_cnt,
+          SUM(CASE WHEN m.curation_status = 'excluded' OR f.corpus_status = 'excluded' THEN 1 ELSE 0 END) as excluded_cnt
+        FROM memes m
+        LEFT JOIN meme_curation_final f ON m.id = f.meme_id
+        WHERE m.id NOT IN (SELECT meme_id FROM meme_force_removals)
+      `).first<{ active_cnt: number; archived_cnt: number; draft_cnt: number; excluded_cnt: number }>();
+
+      activeCount = statusRes?.active_cnt ?? 0;
+      archivedCount = statusRes?.archived_cnt ?? 0;
+      draftCount = statusRes?.draft_cnt ?? 0;
+      excludedCount = statusRes?.excluded_cnt ?? 0;
+    } catch {
+      // fallback
     }
 
     // 2. Final resolved count (Authoritative Keep / Active vs Excluded)
@@ -119,11 +149,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const judges = (judgeResults || []).map((j) => {
       const purged = forceRemovedMap.get(j.user_id) || 0;
       const activeReviewed = j.total_reviewed || 0;
-      const isAiJudge = j.user_id === "user-judge4";
+      const isAiJudge = j.user_id === "user-judge4" || j.user_id === "user-ai-judge";
       return {
         ...j,
         user_name: isAiJudge ? "AI Judge" : j.user_name,
         total_reviewed: activeReviewed + purged,
+        personal_reviewed: activeReviewed,
         active_reviewed: activeReviewed,
         kept: j.kept || 0,
         excluded: j.excluded || 0,
@@ -223,7 +254,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const unreviewed = Math.max(0, totalMemes - reviewedMemeCount);
 
     return json({
+      total_records: totalRecords,
       total_memes: totalMemes,
+      live_corpus: totalMemes,
+      active_count: activeCount,
+      archived_count: archivedCount,
+      draft_count: draftCount,
+      excluded_count: excludedCount,
       resolved_count: resolvedActiveCount, // Canonical Authoritative Active count
       resolved_active_count: resolvedActiveCount,
       resolved_excluded_count: resolvedExcludedCount,

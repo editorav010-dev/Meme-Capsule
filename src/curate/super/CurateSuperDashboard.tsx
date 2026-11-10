@@ -203,8 +203,20 @@ export default function CurateSuperDashboard({
             {summary && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "24px" }}>
             <div style={{ background: "#1c1b1b", border: "1px solid #444", padding: "14px" }}>
-              <div style={{ fontSize: "11px", color: "#888" }}>TOTAL CORPUS</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: "11px", color: "#888" }}>LIVE CORPUS</div>
+                {summary.total_records ? (
+                  <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }} title="Total physical records in database">
+                    DB: {summary.total_records}
+                  </span>
+                ) : null}
+              </div>
               <div className="curate-anton" style={{ fontSize: "24px", color: "#fff" }}>{summary.total_memes}</div>
+              {summary.total_records && summary.total_force_removed ? (
+                <div style={{ fontSize: "10px", color: "#777", marginTop: "2px", fontFamily: "monospace" }}>
+                  {summary.total_records} total − {summary.total_force_removed} purged
+                </div>
+              ) : null}
             </div>
 
             <div style={{ background: "#1c1b1b", border: "1px solid #34C759", padding: "14px" }}>
@@ -294,7 +306,9 @@ export default function CurateSuperDashboard({
                           {isAiJudge ? "AI ADVISORY" : "HUMAN"}
                         </span>
                       </div>
-                      <span style={{ fontSize: "12px", fontFamily: "monospace", color: "#f4c300" }}>{j.total_reviewed} reviewed</span>
+                      <span style={{ fontSize: "12px", fontFamily: "monospace", color: "#f4c300" }}>
+                        {j.personal_reviewed !== undefined ? `${j.personal_reviewed} reviewed` : `${j.total_reviewed} reviewed`}
+                      </span>
                     </div>
                     <div style={{ display: "flex", gap: "8px", fontSize: "11px", color: "#aaa", flexWrap: "wrap", marginTop: "8px" }}>
                       <span style={{ color: "#34C759" }}>{j.kept} Kept</span>

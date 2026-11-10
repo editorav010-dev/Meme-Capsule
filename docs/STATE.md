@@ -590,3 +590,30 @@ The single source of truth across all 3 codebases lives in `docs/MEME_CAPSULE_KN
   - Updated `tests/aiJudgeQueues.test.ts` and `tests/curationConsensus.test.mjs` to remove Judge 5.
   - Full test suite passing: 31 Vitest tests + 9 Node consensus tests (40/40 tests passing).
   - Production build: `npm run build` compiled 1,719 modules cleanly with zero errors in 8.45s.
+
+## 20. Batch-Based Curation Architecture Review & Dashboard Reconciliation (November 10, 2026)
+
+- **1. Mathematical Reconciliation of Dashboard Metrics**:
+  - Resolved counting discrepancies between Admin Console and Superadmin Command Center by establishing standardized mathematical definitions:
+    - `Total Physical DB Records`: 5,503 (raw rows in `memes`).
+    - `Purged Records`: 2,747 (tracked in `meme_force_removals`).
+    - `Live Curation Corpus`: 2,756 (`memes` excluding `meme_force_removals`).
+    - `Live Corpus Breakdown`: 735 Active + 1,040 Excluded + 719 Archived + 262 Drafts = 2,756.
+    - `NSFW Tag`: Orthogonal content flag (`memes.is_nsfw = 1`, 65 memes), separated from lifecycle statuses.
+
+- **2. Legacy Batch Partitioning (Migration 028)**:
+  - Created `d1/migrations/028_assign_legacy_batches.sql` to group the 4,560 pre-migration unbatched memes into 5 synthetic batches (`Legacy Batch 1` through `Legacy Batch 5`, max 1,000 items each).
+  - Maps unbatched memes in `ingestion_jobs` as `upload_state = 'uploaded'` and `state = 'human_ready'` without mutating existing statuses, reviews, or consensus outcomes.
+
+- **3. Independent Per-Judge Workload Accounting**:
+  - Decoupled individual judge progress from consensus finalization in `functions/api/curate/super/summary.ts`.
+  - Added `personal_reviewed` to judge objects so that individual reviews are accurately tracked without being conflated with purge counts or consensus closures.
+
+- **4. Standardized Reporting & Frontend Alignment**:
+  - Updated `functions/api/admin/memes.ts` and `functions/api/curate/super/summary.ts` to expose `live_corpus`, `purged`, `total_records`, and detailed status breakdowns.
+  - Enhanced Admin Console stats bar (`src/admin/AdminApp.tsx`) to show `2,756 live • 2,747 purged` under Total Memes.
+  - Updated Superadmin Command Center (`src/curate/super/CurateSuperDashboard.tsx`) to label the primary metric as `LIVE CORPUS` with explicit database total breakdown.
+
+- **5. Verification & Automated Tests**:
+  - `npm run build` compiled cleanly with zero TypeScript errors.
+  - All 40 unit and integration tests passing (`npm test`).

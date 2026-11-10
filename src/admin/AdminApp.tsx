@@ -1037,6 +1037,11 @@ export default function AdminApp() {
             <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
               <p>Total Memes</p>
               <p className="stat-value total">{stats.total}</p>
+              {stats.live_corpus !== undefined && stats.purged ? (
+                <span style={{ fontSize: "10px", color: "var(--on-surface-variant)", display: "block", marginTop: "2px", fontFamily: "monospace" }}>
+                  {stats.live_corpus} live • {stats.purged} purged
+                </span>
+              ) : null}
             </div>
             <div className="stat-card brutalist-border brutalist-shadow-black brutalist-interactive">
               <p>Active</p>

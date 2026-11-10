@@ -163,7 +163,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   // 1. Calculate corpus statistics if requested
-  let stats: { total: number; active: number; drafts: number; archived: number; excluded: number; nsfw: number } | undefined;
+  let stats: { total: number; live_corpus?: number; purged?: number; active: number; drafts: number; archived: number; excluded: number; nsfw: number } | undefined;
   if (isVaultQuery || url.searchParams.get("stats") === "1" || url.searchParams.get("stats") === "true") {
     try {
       const statsRow = await env.DB.prepare(
@@ -178,9 +178,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
          LEFT JOIN meme_curation_final f ON m.id = f.meme_id`
       ).first<{ total: number; active: number; drafts: number; archived: number; excluded: number; nsfw: number }>();
 
+      let purged = 0;
+      try {
+        const forceRes = await env.DB.prepare("SELECT COUNT(*) as cnt FROM meme_force_removals").first<{ cnt: number }>();
+        purged = forceRes?.cnt ?? 0;
+      } catch {
+        purged = 0;
+      }
+
       if (statsRow) {
+        const rawTotal = Number(statsRow.total) || 0;
         stats = {
-          total: Number(statsRow.total) || 0,
+          total: rawTotal,
+          live_corpus: Math.max(0, rawTotal - purged),
+          purged,
           active: Number(statsRow.active) || 0,
           drafts: Number(statsRow.drafts) || 0,
           archived: Number(statsRow.archived) || 0,

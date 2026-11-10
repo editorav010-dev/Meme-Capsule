@@ -379,6 +379,8 @@ export type VaultQuery = {
 
 export type VaultStats = {
   total: number;
+  live_corpus?: number;
+  purged?: number;
   active: number;
   drafts: number;
   archived: number;
